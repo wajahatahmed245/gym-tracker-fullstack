@@ -645,6 +645,19 @@ body {
   margin-bottom: 18px;
 }
 
+.hero-trainer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 6px;
+  margin-bottom: 6px;
+}
+
 .hero-stats {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

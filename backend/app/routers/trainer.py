@@ -213,6 +213,16 @@ def remove_client(
         note=payload.note,
     )
     db.add(note)
+
+    assigned_workouts = db.execute(
+        select(AssignedWorkout).where(
+            AssignedWorkout.exerciser_id == client.id,
+            AssignedWorkout.trainer_id == trainer.id,
+        )
+    ).scalars().all()
+    for assigned in assigned_workouts:
+        db.delete(assigned)
+
     client.exerciser_profile.trainer_id = None
     db.commit()
 

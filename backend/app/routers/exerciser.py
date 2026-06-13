@@ -271,15 +271,27 @@ def leave_trainer(
     if profile.trainer_id is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No trainer selected")
 
+    trainer_id = profile.trainer_id
+
     note = TrainerNote(
-        trainer_id=profile.trainer_id,
+        trainer_id=trainer_id,
         exerciser_id=user.id,
         exerciser_name=user.name,
         author=NoteAuthor.exerciser,
         note=payload.note,
     )
     db.add(note)
-    logger.info("Exerciser id=%s left trainer_id=%s", user.id, profile.trainer_id)
+
+    assigned_workouts = db.execute(
+        select(AssignedWorkout).where(
+            AssignedWorkout.exerciser_id == user.id,
+            AssignedWorkout.trainer_id == trainer_id,
+        )
+    ).scalars().all()
+    for assigned in assigned_workouts:
+        db.delete(assigned)
+
+    logger.info("Exerciser id=%s left trainer_id=%s", user.id, trainer_id)
     profile.trainer_id = None
     db.commit()
     db.refresh(profile)

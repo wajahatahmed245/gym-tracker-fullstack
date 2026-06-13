@@ -42,6 +42,7 @@ function Exerciser({ user, onUserChange }) {
   });
 
   const trainerId = user?.exerciser_profile?.trainer_id || null;
+  const currentTrainer = trainers.find((t) => t.id === trainerId);
 
   useEffect(() => {
     let cancelled = false;
@@ -272,6 +273,9 @@ function Exerciser({ user, onUserChange }) {
         {error && <div className="auth-error">{error}</div>}
         <div className="hero-card">
           <div className="hero-greeting">Welcome back, {user?.name} 👋</div>
+          {currentTrainer && (
+            <div className="hero-trainer">🧑‍🏫 Trainer: {currentTrainer.name}</div>
+          )}
           <div className="hero-subtitle">Here's how your week is going</div>
           <div className="hero-stats">
             <div className="hero-stat">
@@ -572,7 +576,6 @@ function Exerciser({ user, onUserChange }) {
   }
 
   if (screen === "trainer") {
-    const currentTrainer = trainers.find((t) => t.id === trainerId);
     const otherTrainers = trainers.filter((t) => t.id !== trainerId);
 
     return (
