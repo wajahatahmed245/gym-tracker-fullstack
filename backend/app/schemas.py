@@ -58,6 +58,7 @@ class ExerciserProfileOut(BaseModel):
 
     goal: Goal
     trainer_id: Optional[int] = None
+    trainer_joined_at: Optional[datetime] = None
 
 
 class TrainerProfileOut(BaseModel):
@@ -173,6 +174,7 @@ class ClientOut(BaseModel):
     last_workout_date: Optional[date_type] = None
     total_workouts: int
     streak: int
+    joined_at: Optional[datetime] = None
 
 
 class RecentWorkoutItem(BaseModel):
@@ -189,6 +191,7 @@ class ClientDetailOut(BaseModel):
     goal: Goal
     total_workouts: int
     streak: int
+    joined_at: Optional[datetime] = None
     assigned_workouts: List[AssignedWorkoutOut]
     recent_workouts: List[RecentWorkoutItem]
 

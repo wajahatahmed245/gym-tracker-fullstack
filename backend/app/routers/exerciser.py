@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -249,6 +249,7 @@ def select_trainer(payload: TrainerSelect, user: User = Depends(require_exercise
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trainer not found")
 
     user.exerciser_profile.trainer_id = trainer.id
+    user.exerciser_profile.trainer_joined_at = datetime.utcnow()
     db.commit()
 
     logger.info("Exerciser id=%s selected trainer_id=%s", user.id, trainer.id)
@@ -295,6 +296,7 @@ def leave_trainer(
 
     logger.info("Exerciser id=%s left trainer_id=%s", user.id, trainer_id)
     profile.trainer_id = None
+    profile.trainer_joined_at = None
     db.commit()
     db.refresh(profile)
 

@@ -109,6 +109,7 @@ class ExerciserProfile(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, nullable=False)
     goal: Mapped[Goal] = mapped_column(Enum(Goal), nullable=False, default=Goal.general_fitness)
     trainer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    trainer_joined_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="exerciser_profile", foreign_keys=[user_id])
     trainer: Mapped[Optional["User"]] = relationship("User", foreign_keys=[trainer_id])

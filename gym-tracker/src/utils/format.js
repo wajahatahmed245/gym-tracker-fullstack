@@ -6,6 +6,12 @@ export function formatDateLabel(dateStr) {
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
+export function formatJoinedDate(isoString) {
+  if (!isoString) return "";
+  const d = new Date(isoString);
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
 export function sinceLabel(days) {
   if (days === null || days === undefined) return "—";
   if (days === 0) return "Today";

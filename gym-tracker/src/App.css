@@ -427,9 +427,23 @@ body {
   flex-shrink: 0;
 }
 
+.avatar-lg {
+  width: 56px;
+  height: 56px;
+  font-size: 18px;
+}
+
 .card-text {
   flex: 1;
   min-width: 0;
+}
+
+.card-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
 }
 
 .card-title {
@@ -765,6 +779,11 @@ body {
   color: var(--color-primary-dark);
 }
 
+.tag-goal {
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+}
+
 /* ---------- Streak badge ---------- */
 .streak-badge {
   display: inline-flex;
@@ -774,6 +793,21 @@ body {
   font-weight: 700;
   color: var(--color-warning);
   background: var(--color-warning-bg);
+  padding: 3px 10px;
+  border-radius: 999px;
+  margin-top: 6px;
+}
+
+/* ---------- Joined badge ---------- */
+.joined-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
   padding: 3px 10px;
   border-radius: 999px;
   margin-top: 6px;

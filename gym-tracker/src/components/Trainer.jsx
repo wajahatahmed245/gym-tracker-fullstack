@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BODY_PARTS, bodyPartMeta } from "../utils/bodyParts";
-import { formatDateLabel, initialsFor } from "../utils/format";
+import { formatDateLabel, formatJoinedDate, initialsFor } from "../utils/format";
 import { api } from "../api/client";
 
 function Trainer() {
@@ -190,8 +190,9 @@ function Trainer() {
   if (pending) {
     return (
       <div>
-        <div className="screen-header">
-          <span className="screen-title">My Clients</span>
+        <div className="hero-card">
+          <div className="hero-greeting">👥 My Clients</div>
+          <div className="hero-subtitle">Your trainer account is awaiting approval</div>
         </div>
         <div className="info-box">
           Your trainer account is pending admin approval. You'll be able to see your clients once approved.
@@ -216,10 +217,15 @@ function Trainer() {
 
         <div className="card">
           <div className="card-row">
-            <div className="avatar">{initialsFor(clientDetail.name)}</div>
+            <div className="avatar avatar-lg">{initialsFor(clientDetail.name)}</div>
             <div className="card-text">
               <div className="card-title">{clientDetail.name}</div>
-              <div className="card-subtitle">Goal: {clientDetail.goal}</div>
+              <div className="card-meta-row">
+                <span className="tag tag-goal">🎯 {clientDetail.goal}</span>
+                {clientDetail.joined_at && (
+                  <span className="joined-badge">📅 Joined {formatJoinedDate(clientDetail.joined_at)}</span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -261,7 +267,7 @@ function Trainer() {
         </div>
 
         <div className="section">
-          <div className="section-title">Assigned Exercises</div>
+          <div className="section-title">🏋️ Assigned Exercises</div>
           {clientDetail.assigned_workouts.length === 0 && (
             <div className="card-subtitle">No exercises assigned yet.</div>
           )}
@@ -319,7 +325,7 @@ function Trainer() {
         </div>
 
         <div className="section">
-          <div className="section-title">Recent Workout Logs</div>
+          <div className="section-title">📋 Recent Workout Logs</div>
           {clientDetail.recent_workouts.length === 0 && (
             <div className="card-subtitle">No activity yet.</div>
           )}
@@ -391,33 +397,45 @@ function Trainer() {
 
   return (
     <div>
-      <div className="screen-header">
-        <span className="screen-title">My Clients</span>
+      <div className="hero-card">
+        <div className="hero-greeting">👥 My Clients</div>
+        <div className="hero-subtitle">
+          {clients.length === 0
+            ? "No clients yet"
+            : `${clients.length} ${clients.length === 1 ? "client" : "clients"} training with you`}
+        </div>
       </div>
 
       {error && <div className="auth-error">{error}</div>}
 
-      {clients.length === 0 && <div className="card-subtitle">No clients yet.</div>}
+      {clients.length === 0 && <div className="empty-text">No clients yet.</div>}
 
-      {clients.map((client) => (
-        <div className="card clickable" key={client.id} onClick={() => openClient(client.id)}>
-          <div className="card-row">
-            <div className="avatar">{initialsFor(client.name)}</div>
-            <div className="card-text">
-              <div className="card-title">{client.name}</div>
-              <div className="card-subtitle">
-                Last workout: {client.last_workout_date ? formatDateLabel(client.last_workout_date) : "—"}
+      <div className="section">
+        {clients.map((client) => (
+          <div className="card clickable" key={client.id} onClick={() => openClient(client.id)}>
+            <div className="card-row">
+              <div className="avatar">{initialsFor(client.name)}</div>
+              <div className="card-text">
+                <div className="card-title">{client.name}</div>
+                <div className="card-subtitle">
+                  Last workout: {client.last_workout_date ? formatDateLabel(client.last_workout_date) : "—"}
+                </div>
+                <div className="card-meta-row">
+                  <div className="streak-badge">🔥 {client.streak} day streak</div>
+                  {client.joined_at && (
+                    <div className="joined-badge">📅 Joined {formatJoinedDate(client.joined_at)}</div>
+                  )}
+                </div>
               </div>
-              <div className="streak-badge">🔥 {client.streak} day streak</div>
+              <span className="chevron">›</span>
             </div>
-            <span className="chevron">›</span>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
 
       {notes.length > 0 && (
         <div className="section">
-          <div className="section-title">Client Feedback</div>
+          <div className="section-title">💬 Client Feedback</div>
           {notes.map((note, idx) => (
             <div className="card" key={idx}>
               <div className="row-between">

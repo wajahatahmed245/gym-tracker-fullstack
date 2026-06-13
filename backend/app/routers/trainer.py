@@ -62,6 +62,7 @@ def list_clients(trainer: User = Depends(require_approved_trainer), db: Session 
                 last_workout_date=max(dates) if dates else None,
                 total_workouts=len(dates),
                 streak=crud.compute_streak(dates),
+                joined_at=client.exerciser_profile.trainer_joined_at,
             )
         )
     return result
@@ -110,6 +111,7 @@ def client_detail(
         goal=client.exerciser_profile.goal,
         total_workouts=len(dates),
         streak=crud.compute_streak(dates),
+        joined_at=client.exerciser_profile.trainer_joined_at,
         assigned_workouts=assigned,
         recent_workouts=recent,
     )
@@ -225,6 +227,7 @@ def remove_client(
         assigned.active = False
 
     client.exerciser_profile.trainer_id = None
+    client.exerciser_profile.trainer_joined_at = None
     db.commit()
 
     logger.info("Trainer id=%s removed client exerciser_id=%s", trainer.id, client.id)

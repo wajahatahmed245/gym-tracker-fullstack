@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BODY_PARTS, bodyPartMeta } from "../utils/bodyParts";
-import { formatDateLabel, sinceLabel } from "../utils/format";
+import { formatDateLabel, formatJoinedDate, sinceLabel } from "../utils/format";
 import { telHref, whatsappHref } from "../utils/phone";
 import { api } from "../api/client";
 
@@ -596,6 +596,11 @@ function Exerciser({ user, onUserChange }) {
             </div>
             {currentTrainer.phone && (
               <div className="card-subtitle">📞 {currentTrainer.phone}</div>
+            )}
+            {user?.exerciser_profile?.trainer_joined_at && (
+              <div className="joined-badge">
+                📅 Joined {formatJoinedDate(user.exerciser_profile.trainer_joined_at)}
+              </div>
             )}
             {currentTrainer.phone && (
               <div className="row-between" style={{ marginTop: "8px" }}>
