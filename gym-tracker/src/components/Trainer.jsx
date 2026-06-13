@@ -49,6 +49,21 @@ function Trainer() {
     return () => clearInterval(interval);
   }, [pending, selectedId]);
 
+  useEffect(() => {
+    if (selectedId === null) return;
+
+    const interval = setInterval(() => {
+      api.clientDetail(selectedId).then(setClientDetail).catch((err) => {
+        if (err.status === 404) {
+          handleClientGone("This client is no longer assigned to you.");
+        }
+      });
+    }, 8000);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
   const openClient = (id) => {
     setSelectedId(id);
     setShowAssign(false);
