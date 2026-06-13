@@ -32,6 +32,7 @@ class TrainerSignup(BaseModel):
     password: str = Field(min_length=6)
     specialty: Specialty
     experience_years: int = Field(ge=0, default=0)
+    phone: str = Field(min_length=7, max_length=30)
 
 
 class LoginRequest(BaseModel):
@@ -63,6 +64,7 @@ class TrainerProfileOut(BaseModel):
 
     specialty: Specialty
     experience_years: int
+    phone: Optional[str] = None
     approval_status: ApprovalStatus
 
 
@@ -85,10 +87,21 @@ class DashboardOut(BaseModel):
     days_since_last_workout: Optional[int] = None
 
 
-class WorkoutLogCreate(BaseModel):
-    sets: int = Field(gt=0)
+class WorkoutSetIn(BaseModel):
     reps: int = Field(gt=0)
     weight: float = Field(ge=0)
+
+
+class WorkoutSetOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    set_number: int
+    reps: int
+    weight: float
+
+
+class WorkoutLogCreate(BaseModel):
+    sets: List[WorkoutSetIn] = Field(min_length=1)
     date: Optional[date_type] = None
 
 
@@ -97,10 +110,8 @@ class WorkoutOut(BaseModel):
     assigned_workout_id: int
     body_part: BodyPart
     exercise: str
-    sets: int
-    reps: int
-    weight: float
     date: date_type
+    sets: List[WorkoutSetOut]
 
 
 class CardioCreate(BaseModel):
@@ -156,9 +167,7 @@ class RecentWorkoutItem(BaseModel):
     body_part: BodyPart
     exercise: str
     date: date_type
-    sets: int
-    reps: int
-    weight: float
+    sets: List[WorkoutSetOut]
     created_at: datetime
 
 

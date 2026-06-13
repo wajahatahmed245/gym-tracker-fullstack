@@ -18,6 +18,7 @@ from ..schemas import (
     ClientDetailOut,
     ClientOut,
     RecentWorkoutItem,
+    WorkoutSetOut,
 )
 
 router = APIRouter(prefix="/api/trainer", tags=["trainer"])
@@ -90,9 +91,10 @@ def client_detail(
             body_part=w.assigned_workout.body_part,
             exercise=w.assigned_workout.exercise,
             date=w.date,
-            sets=w.sets,
-            reps=w.reps,
-            weight=w.weight,
+            sets=[
+                WorkoutSetOut(set_number=s.set_number, reps=s.reps, weight=s.weight)
+                for s in w.sets
+            ],
             created_at=w.created_at,
         )
         for w in workouts

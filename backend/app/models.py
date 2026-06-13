@@ -115,6 +115,7 @@ class TrainerProfile(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, nullable=False)
     specialty: Mapped[Specialty] = mapped_column(Enum(Specialty), nullable=False)
     experience_years: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    phone: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     approval_status: Mapped[ApprovalStatus] = mapped_column(
         Enum(ApprovalStatus), nullable=False, default=ApprovalStatus.pending
     )
@@ -130,13 +131,28 @@ class Workout(Base):
     assigned_workout_id: Mapped[int] = mapped_column(
         ForeignKey("assigned_workouts.id"), nullable=False, index=True
     )
-    sets: Mapped[int] = mapped_column(Integer, nullable=False)
-    reps: Mapped[int] = mapped_column(Integer, nullable=False)
-    weight: Mapped[float] = mapped_column(Float, nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     assigned_workout: Mapped["AssignedWorkout"] = relationship("AssignedWorkout", back_populates="logs")
+    sets: Mapped[List["WorkoutSet"]] = relationship(
+        "WorkoutSet",
+        back_populates="workout",
+        cascade="all, delete-orphan",
+        order_by="WorkoutSet.set_number",
+    )
+
+
+class WorkoutSet(Base):
+    __tablename__ = "workout_sets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workout_id: Mapped[int] = mapped_column(ForeignKey("workouts.id"), nullable=False, index=True)
+    set_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    reps: Mapped[int] = mapped_column(Integer, nullable=False)
+    weight: Mapped[float] = mapped_column(Float, nullable=False)
+
+    workout: Mapped["Workout"] = relationship("Workout", back_populates="sets")
 
 
 class AssignedWorkout(Base):

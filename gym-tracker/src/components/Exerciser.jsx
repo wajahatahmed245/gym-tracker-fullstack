@@ -26,7 +26,7 @@ function Exerciser({ user, onUserChange }) {
   const [trainerError, setTrainerError] = useState("");
 
   const [expandedId, setExpandedId] = useState(null);
-  const [logForm, setLogForm] = useState({ sets: "", reps: "", weight: "" });
+  const [logSets, setLogSets] = useState([{ reps: "", weight: "" }]);
   const [lastSessions, setLastSessions] = useState({});
 
   const [cardioForm, setCardioForm] = useState({
@@ -94,8 +94,16 @@ function Exerciser({ user, onUserChange }) {
     setCardioForm({ ...cardioForm, [field]: value });
   };
 
-  const handleLogChange = (field, value) => {
-    setLogForm({ ...logForm, [field]: value });
+  const updateSetRow = (index, field, value) => {
+    setLogSets(logSets.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+  };
+
+  const addSetRow = () => {
+    setLogSets([...logSets, { reps: "", weight: "" }]);
+  };
+
+  const removeSetRow = (index) => {
+    setLogSets(logSets.filter((_, i) => i !== index));
   };
 
   const toggleExpand = (assigned) => {
@@ -106,7 +114,7 @@ function Exerciser({ user, onUserChange }) {
       return;
     }
     setExpandedId(assigned.id);
-    setLogForm({ sets: "", reps: "", weight: "" });
+    setLogSets([{ reps: "", weight: "" }]);
     if (!(assigned.id in lastSessions)) {
       api
         .lastWorkoutFor(assigned.id)
@@ -119,22 +127,20 @@ function Exerciser({ user, onUserChange }) {
 
   const submitLog = async (e, assigned) => {
     e.preventDefault();
-    if (!logForm.sets || !logForm.reps || !logForm.weight) {
+    if (logSets.length === 0 || logSets.some((row) => !row.reps || row.weight === "")) {
       return;
     }
     setError("");
     try {
       const logged = await api.logAssignedWorkout(assigned.id, {
-        sets: Number(logForm.sets),
-        reps: Number(logForm.reps),
-        weight: Number(logForm.weight),
+        sets: logSets.map((row) => ({ reps: Number(row.reps), weight: Number(row.weight) })),
       });
       const [dash, w] = await Promise.all([api.dashboard(), api.listWorkouts()]);
       setDashboard(dash);
       setWorkouts(w);
       setLastSessions((prev) => ({ ...prev, [assigned.id]: logged }));
       setSavedMessage("Workout logged successfully!");
-      setLogForm({ sets: "", reps: "", weight: "" });
+      setLogSets([{ reps: "", weight: "" }]);
       setExpandedId(null);
     } catch (err) {
       setError(err.message || "Failed to log workout.");
@@ -259,49 +265,54 @@ function Exerciser({ user, onUserChange }) {
                     <form onSubmit={(e) => submitLog(e, assigned)}>
                       {last && (
                         <div className="card-subtitle">
-                          Last: {formatDateLabel(last.date)} — {last.weight}kg x{last.reps} ({last.sets} sets)
+                          Last ({formatDateLabel(last.date)}): {last.sets
+                            .map((s) => `${s.weight}kg x${s.reps}`)
+                            .join(", ")}
                         </div>
                       )}
                       {last === null && (
                         <div className="card-subtitle">No previous session yet.</div>
                       )}
 
-                      <div className="form-row">
-                        <div className="form-group">
-                          <label className="form-label">Sets</label>
-                          <input
-                            className="form-input"
-                            type="number"
-                            min="1"
-                            placeholder="4"
-                            value={logForm.sets}
-                            onChange={(e) => handleLogChange("sets", e.target.value)}
-                          />
+                      {logSets.map((row, idx) => (
+                        <div className="form-row" key={idx}>
+                          <div className="form-group">
+                            <label className="form-label">Set {idx + 1} Weight (kg)</label>
+                            <input
+                              className="form-input"
+                              type="number"
+                              min="0"
+                              placeholder="80"
+                              value={row.weight}
+                              onChange={(e) => updateSetRow(idx, "weight", e.target.value)}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Reps</label>
+                            <input
+                              className="form-input"
+                              type="number"
+                              min="1"
+                              placeholder="8"
+                              value={row.reps}
+                              onChange={(e) => updateSetRow(idx, "reps", e.target.value)}
+                            />
+                          </div>
+                          {logSets.length > 1 && (
+                            <button
+                              className="btn btn-outline"
+                              type="button"
+                              onClick={() => removeSetRow(idx)}
+                            >
+                              Remove
+                            </button>
+                          )}
                         </div>
-                        <div className="form-group">
-                          <label className="form-label">Reps</label>
-                          <input
-                            className="form-input"
-                            type="number"
-                            min="1"
-                            placeholder="8"
-                            value={logForm.reps}
-                            onChange={(e) => handleLogChange("reps", e.target.value)}
-                          />
-                        </div>
-                      </div>
+                      ))}
 
-                      <div className="form-group">
-                        <label className="form-label">Weight (kg)</label>
-                        <input
-                          className="form-input"
-                          type="number"
-                          min="0"
-                          placeholder="80"
-                          value={logForm.weight}
-                          onChange={(e) => handleLogChange("weight", e.target.value)}
-                        />
-                      </div>
+                      <button className="btn btn-outline" type="button" onClick={addSetRow}>
+                        ➕ Add Set
+                      </button>
 
                       <button className="btn btn-primary" type="submit">Save</button>
                     </form>
@@ -342,9 +353,11 @@ function Exerciser({ user, onUserChange }) {
                       {meta.icon} {meta.label}
                     </span>
                   </div>
-                  <div className="card-subtitle">
-                    {item.sets} sets x {item.reps} reps @ {item.weight}kg
-                  </div>
+                  {item.sets.map((s) => (
+                    <div className="card-subtitle" key={s.set_number}>
+                      Set {s.set_number}: {s.weight}kg x {s.reps} reps
+                    </div>
+                  ))}
                 </div>
               );
             })}

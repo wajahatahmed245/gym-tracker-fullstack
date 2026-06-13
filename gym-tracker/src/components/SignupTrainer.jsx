@@ -13,6 +13,7 @@ function SignupTrainer({ onSignup, onBack }) {
   const [form, setForm] = useState({
     name: "",
     email: "",
+    phone: "",
     password: "",
     confirmPassword: "",
     specialty: SPECIALTIES[0],
@@ -27,7 +28,7 @@ function SignupTrainer({ onSignup, onBack }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.password || !form.confirmPassword) {
+    if (!form.name || !form.email || !form.phone || !form.password || !form.confirmPassword) {
       setError("Please fill in all required fields.");
       return;
     }
@@ -41,6 +42,7 @@ function SignupTrainer({ onSignup, onBack }) {
       const data = await api.signupTrainer({
         name: form.name,
         email: form.email,
+        phone: form.phone,
         password: form.password,
         specialty: form.specialty,
         experience_years: Number(form.experience) || 0,
@@ -87,6 +89,17 @@ function SignupTrainer({ onSignup, onBack }) {
               placeholder="you@example.com"
               value={form.email}
               onChange={(e) => handleChange("email", e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Phone Number</label>
+            <input
+              className="form-input"
+              type="tel"
+              placeholder="e.g. +92 300 1234567"
+              value={form.phone}
+              onChange={(e) => handleChange("phone", e.target.value)}
             />
           </div>
 

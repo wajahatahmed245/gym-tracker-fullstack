@@ -20,6 +20,7 @@ from ..models import (
     TrainerProfile,
     User,
     Workout,
+    WorkoutSet,
 )
 from ..schemas import (
     AssignedWorkoutOut,
@@ -30,6 +31,7 @@ from ..schemas import (
     TrainerSelect,
     WorkoutLogCreate,
     WorkoutOut,
+    WorkoutSetOut,
 )
 
 router = APIRouter(prefix="/api", tags=["exerciser"])
@@ -43,10 +45,11 @@ def _workout_out(workout: Workout) -> WorkoutOut:
         assigned_workout_id=workout.assigned_workout_id,
         body_part=workout.assigned_workout.body_part,
         exercise=workout.assigned_workout.exercise,
-        sets=workout.sets,
-        reps=workout.reps,
-        weight=workout.weight,
         date=workout.date,
+        sets=[
+            WorkoutSetOut(set_number=s.set_number, reps=s.reps, weight=s.weight)
+            for s in workout.sets
+        ],
     )
 
 
@@ -100,18 +103,18 @@ def log_assigned_workout(
     workout = Workout(
         exerciser_id=user.id,
         assigned_workout_id=assigned.id,
-        sets=payload.sets,
-        reps=payload.reps,
-        weight=payload.weight,
         date=payload.date or date.today(),
     )
+    for set_number, set_in in enumerate(payload.sets, start=1):
+        workout.sets.append(WorkoutSet(set_number=set_number, reps=set_in.reps, weight=set_in.weight))
+
     db.add(workout)
     db.commit()
     db.refresh(workout)
 
     logger.info(
-        "Workout logged: exerciser_id=%s assigned_workout_id=%s exercise=%s",
-        user.id, assigned.id, assigned.exercise,
+        "Workout logged: exerciser_id=%s assigned_workout_id=%s exercise=%s sets=%s",
+        user.id, assigned.id, assigned.exercise, len(payload.sets),
     )
     return _workout_out(workout)
 

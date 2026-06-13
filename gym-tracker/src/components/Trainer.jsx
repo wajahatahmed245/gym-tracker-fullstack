@@ -227,9 +227,7 @@ function Trainer() {
             return (
               <div className="card" key={idx}>
                 <div className="row-between">
-                  <div className="card-title">
-                    {item.exercise}: {item.weight}kg x{item.reps} ({item.sets} sets)
-                  </div>
+                  <div className="card-title">{item.exercise}</div>
                   {meta && (
                     <span className={`tag ${meta.tagClass}`}>
                       {meta.icon} {meta.label}
@@ -237,6 +235,11 @@ function Trainer() {
                   )}
                 </div>
                 <div className="card-subtitle">{formatDateLabel(item.date)}</div>
+                {item.sets.map((s) => (
+                  <div className="card-subtitle" key={s.set_number}>
+                    Set {s.set_number}: {s.weight}kg x {s.reps} reps
+                  </div>
+                ))}
               </div>
             );
           })}

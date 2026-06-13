@@ -77,6 +77,7 @@ def signup_trainer(payload: TrainerSignup, db: Session = Depends(get_db)):
         user_id=user.id,
         specialty=payload.specialty,
         experience_years=payload.experience_years,
+        phone=payload.phone,
     )
     db.add(profile)
     db.commit()
