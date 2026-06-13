@@ -111,6 +111,7 @@ class WorkoutOut(BaseModel):
     assigned_workout_id: int
     body_part: BodyPart
     exercise: str
+    trainer_name: str
     date: date_type
     sets: List[WorkoutSetOut]
 

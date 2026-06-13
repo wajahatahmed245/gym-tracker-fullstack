@@ -39,7 +39,7 @@ def _get_client_or_404(db: Session, trainer: User, exerciser_id: int) -> User:
 
 def _get_client_assigned_workout_or_404(db: Session, client: User, assigned_id: int) -> AssignedWorkout:
     assigned = db.get(AssignedWorkout, assigned_id)
-    if assigned is None or assigned.exerciser_id != client.id:
+    if assigned is None or assigned.exerciser_id != client.id or not assigned.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assigned exercise not found")
     return assigned
 
@@ -84,7 +84,7 @@ def client_detail(
 
     assigned = db.execute(
         select(AssignedWorkout)
-        .where(AssignedWorkout.exerciser_id == client.id)
+        .where(AssignedWorkout.exerciser_id == client.id, AssignedWorkout.active.is_(True))
         .order_by(AssignedWorkout.created_at.desc())
     ).scalars().all()
 
@@ -218,10 +218,11 @@ def remove_client(
         select(AssignedWorkout).where(
             AssignedWorkout.exerciser_id == client.id,
             AssignedWorkout.trainer_id == trainer.id,
+            AssignedWorkout.active.is_(True),
         )
     ).scalars().all()
     for assigned in assigned_workouts:
-        db.delete(assigned)
+        assigned.active = False
 
     client.exerciser_profile.trainer_id = None
     db.commit()

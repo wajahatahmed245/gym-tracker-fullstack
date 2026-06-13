@@ -5,6 +5,7 @@ from datetime import date, datetime
 from typing import List, Optional
 
 from sqlalchemy import (
+    Boolean,
     Date,
     DateTime,
     Enum,
@@ -168,11 +169,13 @@ class AssignedWorkout(Base):
     trainer_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     body_part: Mapped[BodyPart] = mapped_column(Enum(BodyPart), nullable=False)
     exercise: Mapped[str] = mapped_column(String(120), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
 
+    trainer: Mapped["User"] = relationship("User", foreign_keys=[trainer_id])
     logs: Mapped[List["Workout"]] = relationship(
         "Workout", back_populates="assigned_workout", cascade="all, delete-orphan"
     )

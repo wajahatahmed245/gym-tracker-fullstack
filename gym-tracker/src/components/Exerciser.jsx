@@ -437,6 +437,7 @@ function Exerciser({ user, onUserChange }) {
                       {meta.icon} {meta.label}
                     </span>
                   </div>
+                  <div className="card-subtitle">Assigned by {item.trainer_name}</div>
 
                   {editingWorkoutId === item.id ? (
                     <form onSubmit={(e) => submitEditWorkout(e, item.id)}>

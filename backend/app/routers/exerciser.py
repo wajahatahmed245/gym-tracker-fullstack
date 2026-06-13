@@ -50,6 +50,7 @@ def _workout_out(workout: Workout) -> WorkoutOut:
         assigned_workout_id=workout.assigned_workout_id,
         body_part=workout.assigned_workout.body_part,
         exercise=workout.assigned_workout.exercise,
+        trainer_name=workout.assigned_workout.trainer.name,
         date=workout.date,
         sets=[
             WorkoutSetOut(set_number=s.set_number, reps=s.reps, weight=s.weight)
@@ -60,7 +61,7 @@ def _workout_out(workout: Workout) -> WorkoutOut:
 
 def _get_own_assigned_workout_or_404(db: Session, user: User, assigned_id: int) -> AssignedWorkout:
     assigned = db.get(AssignedWorkout, assigned_id)
-    if assigned is None or assigned.exerciser_id != user.id:
+    if assigned is None or assigned.exerciser_id != user.id or not assigned.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assigned exercise not found")
     return assigned
 
@@ -130,7 +131,7 @@ def delete_workout(workout_id: int, user: User = Depends(require_exerciser), db:
 def list_assigned_workouts(user: User = Depends(require_exerciser), db: Session = Depends(get_db)):
     return db.execute(
         select(AssignedWorkout)
-        .where(AssignedWorkout.exerciser_id == user.id)
+        .where(AssignedWorkout.exerciser_id == user.id, AssignedWorkout.active.is_(True))
         .order_by(AssignedWorkout.created_at.desc())
     ).scalars().all()
 
@@ -286,10 +287,11 @@ def leave_trainer(
         select(AssignedWorkout).where(
             AssignedWorkout.exerciser_id == user.id,
             AssignedWorkout.trainer_id == trainer_id,
+            AssignedWorkout.active.is_(True),
         )
     ).scalars().all()
     for assigned in assigned_workouts:
-        db.delete(assigned)
+        assigned.active = False
 
     logger.info("Exerciser id=%s left trainer_id=%s", user.id, trainer_id)
     profile.trainer_id = None
