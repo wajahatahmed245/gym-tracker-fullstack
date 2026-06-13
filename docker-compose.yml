@@ -1,0 +1,21 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/logs:/app/logs
+
+  frontend:
+    build:
+      context: ./gym-tracker
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend

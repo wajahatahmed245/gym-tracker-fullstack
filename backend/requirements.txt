@@ -1,0 +1,10 @@
+fastapi>=0.109,<0.115
+uvicorn[standard]>=0.27,<0.31
+sqlalchemy>=2.0,<2.1
+alembic>=1.13,<1.14
+pydantic>=2.5,<2.10
+email-validator>=2.1,<2.3
+pydantic-settings>=2.1,<2.6
+pyjwt>=2.8,<2.10
+bcrypt>=4.0,<4.2
+python-multipart>=0.0.9,<0.1
