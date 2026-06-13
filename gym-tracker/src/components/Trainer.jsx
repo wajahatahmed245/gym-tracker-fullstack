@@ -38,6 +38,17 @@ function Trainer() {
     api.trainerNotes().then(setNotes).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (pending || selectedId !== null) return;
+
+    const interval = setInterval(() => {
+      api.clients().then(setClients).catch(() => {});
+      api.trainerNotes().then(setNotes).catch(() => {});
+    }, 8000);
+
+    return () => clearInterval(interval);
+  }, [pending, selectedId]);
+
   const openClient = (id) => {
     setSelectedId(id);
     setShowAssign(false);
