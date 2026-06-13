@@ -11,6 +11,7 @@ from .models import (
     BodyPart,
     CardioActivity,
     Goal,
+    NoteAuthor,
     Role,
     Specialty,
 )
@@ -146,10 +147,20 @@ class TrainerListItem(BaseModel):
     name: str
     specialty: Specialty
     experience_years: int
+    phone: Optional[str] = None
 
 
 class TrainerSelect(BaseModel):
     trainer_id: int
+
+
+class LeaveNoteIn(BaseModel):
+    note: str = Field(min_length=1, max_length=1000)
+
+
+class WorkoutUpdate(BaseModel):
+    sets: List[WorkoutSetIn] = Field(min_length=1)
+    date: Optional[date_type] = None
 
 
 # ---------- Trainer ----------
@@ -189,6 +200,15 @@ class AssignWorkoutCreate(BaseModel):
 class AssignedWorkoutUpdate(BaseModel):
     body_part: Optional[BodyPart] = None
     exercise: Optional[str] = Field(default=None, min_length=1, max_length=120)
+
+
+class TrainerNoteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    exerciser_name: str
+    author: NoteAuthor
+    note: str
+    created_at: datetime
 
 
 # ---------- Admin ----------

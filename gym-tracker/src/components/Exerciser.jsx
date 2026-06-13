@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { BODY_PARTS, bodyPartMeta } from "../utils/bodyParts";
 import { formatDateLabel, sinceLabel } from "../utils/format";
+import { telHref, whatsappHref } from "../utils/phone";
 import { api } from "../api/client";
 
 const CARDIO_TYPES = [
@@ -28,6 +29,12 @@ function Exerciser({ user, onUserChange }) {
   const [expandedId, setExpandedId] = useState(null);
   const [logSets, setLogSets] = useState([{ reps: "", weight: "" }]);
   const [lastSessions, setLastSessions] = useState({});
+
+  const [showLeaveForm, setShowLeaveForm] = useState(false);
+  const [leaveNote, setLeaveNote] = useState("");
+
+  const [editingWorkoutId, setEditingWorkoutId] = useState(null);
+  const [editWorkoutSets, setEditWorkoutSets] = useState([{ reps: "", weight: "" }]);
 
   const [cardioForm, setCardioForm] = useState({
     activity: CARDIO_TYPES[0].id,
@@ -87,6 +94,9 @@ function Exerciser({ user, onUserChange }) {
   const goHome = () => {
     setSavedMessage("");
     setError("");
+    setShowLeaveForm(false);
+    setLeaveNote("");
+    setEditingWorkoutId(null);
     setScreen("home");
   };
 
@@ -104,6 +114,76 @@ function Exerciser({ user, onUserChange }) {
 
   const removeSetRow = (index) => {
     setLogSets(logSets.filter((_, i) => i !== index));
+  };
+
+  const updateEditSetRow = (index, field, value) => {
+    setEditWorkoutSets(editWorkoutSets.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+  };
+
+  const addEditSetRow = () => {
+    setEditWorkoutSets([...editWorkoutSets, { reps: "", weight: "" }]);
+  };
+
+  const removeEditSetRow = (index) => {
+    setEditWorkoutSets(editWorkoutSets.filter((_, i) => i !== index));
+  };
+
+  const startEditWorkout = (item) => {
+    setError("");
+    setEditingWorkoutId(item.id);
+    setEditWorkoutSets(item.sets.map((s) => ({ reps: String(s.reps), weight: String(s.weight) })));
+  };
+
+  const cancelEditWorkout = () => {
+    setEditingWorkoutId(null);
+  };
+
+  const submitEditWorkout = async (e, workoutId) => {
+    e.preventDefault();
+    if (editWorkoutSets.length === 0 || editWorkoutSets.some((row) => !row.reps || row.weight === "")) {
+      return;
+    }
+    setError("");
+    try {
+      const updated = await api.updateWorkout(workoutId, {
+        sets: editWorkoutSets.map((row) => ({ reps: Number(row.reps), weight: Number(row.weight) })),
+      });
+      setWorkouts(workouts.map((w) => (w.id === workoutId ? updated : w)));
+      if (lastSessions[updated.assigned_workout_id]?.id === workoutId) {
+        setLastSessions((prev) => ({ ...prev, [updated.assigned_workout_id]: updated }));
+      }
+      setEditingWorkoutId(null);
+    } catch (err) {
+      setError(err.message || "Failed to update workout.");
+    }
+  };
+
+  const deleteWorkoutEntry = async (workoutId) => {
+    if (!window.confirm("Delete this workout entry? This cannot be undone.")) return;
+    setError("");
+    try {
+      await api.deleteWorkout(workoutId);
+      setWorkouts(workouts.filter((w) => w.id !== workoutId));
+      const [dash] = await Promise.all([api.dashboard()]);
+      setDashboard(dash);
+      if (editingWorkoutId === workoutId) setEditingWorkoutId(null);
+    } catch (err) {
+      setError(err.message || "Failed to delete workout.");
+    }
+  };
+
+  const submitLeaveTrainer = async (e) => {
+    e.preventDefault();
+    if (!leaveNote.trim()) return;
+    setTrainerError("");
+    try {
+      await api.leaveTrainer(leaveNote.trim());
+      await Promise.all([onUserChange?.(), api.assignedWorkouts().then(setAssignedWorkouts)]);
+      setLeaveNote("");
+      setShowLeaveForm(false);
+    } catch (err) {
+      setTrainerError(err.message || "Failed to leave trainer.");
+    }
   };
 
   const toggleExpand = (assigned) => {
@@ -353,11 +433,67 @@ function Exerciser({ user, onUserChange }) {
                       {meta.icon} {meta.label}
                     </span>
                   </div>
-                  {item.sets.map((s) => (
-                    <div className="card-subtitle" key={s.set_number}>
-                      Set {s.set_number}: {s.weight}kg x {s.reps} reps
-                    </div>
-                  ))}
+
+                  {editingWorkoutId === item.id ? (
+                    <form onSubmit={(e) => submitEditWorkout(e, item.id)}>
+                      {editWorkoutSets.map((row, idx) => (
+                        <div className="form-row" key={idx}>
+                          <div className="form-group">
+                            <label className="form-label">Set {idx + 1} Weight (kg)</label>
+                            <input
+                              className="form-input"
+                              type="number"
+                              min="0"
+                              value={row.weight}
+                              onChange={(e) => updateEditSetRow(idx, "weight", e.target.value)}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Reps</label>
+                            <input
+                              className="form-input"
+                              type="number"
+                              min="1"
+                              value={row.reps}
+                              onChange={(e) => updateEditSetRow(idx, "reps", e.target.value)}
+                            />
+                          </div>
+                          {editWorkoutSets.length > 1 && (
+                            <button
+                              className="btn btn-outline"
+                              type="button"
+                              onClick={() => removeEditSetRow(idx)}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button className="btn btn-outline" type="button" onClick={addEditSetRow}>
+                        ➕ Add Set
+                      </button>
+                      <div className="row-between">
+                        <button className="btn btn-success" type="submit">Save</button>
+                        <button className="btn btn-outline" type="button" onClick={cancelEditWorkout}>Cancel</button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      {item.sets.map((s) => (
+                        <div className="card-subtitle" key={s.set_number}>
+                          Set {s.set_number}: {s.weight}kg x {s.reps} reps
+                        </div>
+                      ))}
+                      <div className="row-between">
+                        <button className="btn btn-outline" type="button" onClick={() => startEditWorkout(item)}>
+                          Edit
+                        </button>
+                        <button className="btn btn-outline" type="button" onClick={() => deleteWorkoutEntry(item.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}
@@ -454,6 +590,49 @@ function Exerciser({ user, onUserChange }) {
             <div className="card-subtitle">
               {currentTrainer.specialty} · {currentTrainer.experience_years} yrs experience
             </div>
+            {currentTrainer.phone && (
+              <div className="card-subtitle">📞 {currentTrainer.phone}</div>
+            )}
+            {currentTrainer.phone && (
+              <div className="row-between" style={{ marginTop: "8px" }}>
+                <a className="btn btn-outline" href={telHref(currentTrainer.phone)}>
+                  📞 Call
+                </a>
+                <a
+                  className="btn btn-outline"
+                  href={whatsappHref(currentTrainer.phone)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  💬 WhatsApp
+                </a>
+              </div>
+            )}
+
+            {showLeaveForm ? (
+              <form onSubmit={submitLeaveTrainer} style={{ marginTop: "12px" }}>
+                <div className="form-group">
+                  <label className="form-label">Reason for leaving</label>
+                  <input
+                    className="form-input"
+                    type="text"
+                    placeholder="e.g. Switching to a trainer closer to home"
+                    value={leaveNote}
+                    onChange={(e) => setLeaveNote(e.target.value)}
+                  />
+                </div>
+                <div className="row-between">
+                  <button className="btn btn-danger" type="submit">Confirm Leave</button>
+                  <button className="btn btn-outline" type="button" onClick={() => { setShowLeaveForm(false); setLeaveNote(""); }}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button className="btn btn-outline" type="button" style={{ marginTop: "8px" }} onClick={() => setShowLeaveForm(true)}>
+                Leave Trainer
+              </button>
+            )}
           </div>
         ) : (
           <div className="info-box">You haven't selected a trainer yet.</div>

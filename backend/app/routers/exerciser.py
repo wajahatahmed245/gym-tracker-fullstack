@@ -16,7 +16,9 @@ from ..models import (
     ApprovalStatus,
     AssignedWorkout,
     CardioLog,
+    NoteAuthor,
     Role,
+    TrainerNote,
     TrainerProfile,
     User,
     Workout,
@@ -27,11 +29,14 @@ from ..schemas import (
     CardioCreate,
     CardioOut,
     DashboardOut,
+    ExerciserProfileOut,
+    LeaveNoteIn,
     TrainerListItem,
     TrainerSelect,
     WorkoutLogCreate,
     WorkoutOut,
     WorkoutSetOut,
+    WorkoutUpdate,
 )
 
 router = APIRouter(prefix="/api", tags=["exerciser"])
@@ -60,6 +65,13 @@ def _get_own_assigned_workout_or_404(db: Session, user: User, assigned_id: int) 
     return assigned
 
 
+def _get_own_workout_or_404(db: Session, user: User, workout_id: int) -> Workout:
+    workout = db.get(Workout, workout_id)
+    if workout is None or workout.exerciser_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workout not found")
+    return workout
+
+
 @router.get("/exerciser/dashboard", response_model=DashboardOut)
 def dashboard(user: User = Depends(require_exerciser), db: Session = Depends(get_db)):
     return DashboardOut(
@@ -76,6 +88,42 @@ def list_workouts(user: User = Depends(require_exerciser), db: Session = Depends
         .order_by(Workout.date.desc(), Workout.id.desc())
     ).scalars().all()
     return [_workout_out(w) for w in workouts]
+
+
+@router.patch("/exerciser/workouts/{workout_id}", response_model=WorkoutOut)
+def update_workout(
+    workout_id: int,
+    payload: WorkoutUpdate,
+    user: User = Depends(require_exerciser),
+    db: Session = Depends(get_db),
+):
+    workout = _get_own_workout_or_404(db, user, workout_id)
+
+    if payload.date is not None:
+        workout.date = payload.date
+
+    workout.sets.clear()
+    for set_number, set_in in enumerate(payload.sets, start=1):
+        workout.sets.append(WorkoutSet(set_number=set_number, reps=set_in.reps, weight=set_in.weight))
+
+    db.commit()
+    db.refresh(workout)
+
+    logger.info(
+        "Workout updated: exerciser_id=%s workout_id=%s sets=%s",
+        user.id, workout.id, len(payload.sets),
+    )
+    return _workout_out(workout)
+
+
+@router.delete("/exerciser/workouts/{workout_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_workout(workout_id: int, user: User = Depends(require_exerciser), db: Session = Depends(get_db)):
+    workout = _get_own_workout_or_404(db, user, workout_id)
+
+    db.delete(workout)
+    db.commit()
+
+    logger.info("Workout deleted: exerciser_id=%s workout_id=%s", user.id, workout_id)
 
 
 @router.get("/exerciser/assigned-workouts", response_model=List[AssignedWorkoutOut])
@@ -181,6 +229,7 @@ def list_trainers(db: Session = Depends(get_db)):
             name=t.name,
             specialty=t.trainer_profile.specialty,
             experience_years=t.trainer_profile.experience_years,
+            phone=t.trainer_profile.phone,
         )
         for t in rows
     ]
@@ -208,4 +257,31 @@ def select_trainer(payload: TrainerSelect, user: User = Depends(require_exercise
         name=trainer.name,
         specialty=trainer.trainer_profile.specialty,
         experience_years=trainer.trainer_profile.experience_years,
+        phone=trainer.trainer_profile.phone,
     )
+
+
+@router.delete("/exerciser/trainer", response_model=ExerciserProfileOut)
+def leave_trainer(
+    payload: LeaveNoteIn,
+    user: User = Depends(require_exerciser),
+    db: Session = Depends(get_db),
+):
+    profile = user.exerciser_profile
+    if profile.trainer_id is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No trainer selected")
+
+    note = TrainerNote(
+        trainer_id=profile.trainer_id,
+        exerciser_id=user.id,
+        exerciser_name=user.name,
+        author=NoteAuthor.exerciser,
+        note=payload.note,
+    )
+    db.add(note)
+    logger.info("Exerciser id=%s left trainer_id=%s", user.id, profile.trainer_id)
+    profile.trainer_id = None
+    db.commit()
+    db.refresh(profile)
+
+    return profile

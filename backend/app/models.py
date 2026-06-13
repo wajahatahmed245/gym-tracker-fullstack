@@ -68,6 +68,11 @@ class CardioActivity(str, enum.Enum):
     elliptical = "Elliptical"
 
 
+class NoteAuthor(str, enum.Enum):
+    trainer = "trainer"
+    exerciser = "exerciser"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -181,4 +186,16 @@ class CardioLog(Base):
     activity: Mapped[CardioActivity] = mapped_column(Enum(CardioActivity), nullable=False)
     duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class TrainerNote(Base):
+    __tablename__ = "trainer_notes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trainer_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    exerciser_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    exerciser_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    author: Mapped[NoteAuthor] = mapped_column(Enum(NoteAuthor), nullable=False)
+    note: Mapped[str] = mapped_column(String(1000), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

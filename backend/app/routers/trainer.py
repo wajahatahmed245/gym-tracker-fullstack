@@ -10,14 +10,16 @@ from .. import crud
 from ..database import get_db
 from ..deps import require_approved_trainer
 from ..logging_config import logger
-from ..models import AssignedWorkout, ExerciserProfile, User, Workout
+from ..models import AssignedWorkout, ExerciserProfile, NoteAuthor, TrainerNote, User, Workout
 from ..schemas import (
     AssignWorkoutCreate,
     AssignedWorkoutOut,
     AssignedWorkoutUpdate,
     ClientDetailOut,
     ClientOut,
+    LeaveNoteIn,
     RecentWorkoutItem,
+    TrainerNoteOut,
     WorkoutSetOut,
 )
 
@@ -192,3 +194,35 @@ def delete_assigned_workout(
         "Trainer id=%s removed assigned_workout_id=%s for exerciser_id=%s",
         trainer.id, assigned_id, client.id,
     )
+
+
+@router.delete("/clients/{exerciser_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_client(
+    exerciser_id: int,
+    payload: LeaveNoteIn,
+    trainer: User = Depends(require_approved_trainer),
+    db: Session = Depends(get_db),
+):
+    client = _get_client_or_404(db, trainer, exerciser_id)
+
+    note = TrainerNote(
+        trainer_id=trainer.id,
+        exerciser_id=client.id,
+        exerciser_name=client.name,
+        author=NoteAuthor.trainer,
+        note=payload.note,
+    )
+    db.add(note)
+    client.exerciser_profile.trainer_id = None
+    db.commit()
+
+    logger.info("Trainer id=%s removed client exerciser_id=%s", trainer.id, client.id)
+
+
+@router.get("/notes", response_model=List[TrainerNoteOut])
+def list_notes(trainer: User = Depends(require_approved_trainer), db: Session = Depends(get_db)):
+    return db.execute(
+        select(TrainerNote)
+        .where(TrainerNote.trainer_id == trainer.id)
+        .order_by(TrainerNote.created_at.desc())
+    ).scalars().all()

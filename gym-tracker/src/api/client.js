@@ -80,6 +80,10 @@ export const api = {
   listTrainers: () => request("/trainers"),
   selectTrainer: (trainerId) =>
     request("/exerciser/trainer", { method: "PATCH", body: { trainer_id: trainerId } }),
+  leaveTrainer: (note) => request("/exerciser/trainer", { method: "DELETE", body: { note } }),
+  updateWorkout: (workoutId, payload) =>
+    request(`/exerciser/workouts/${workoutId}`, { method: "PATCH", body: payload }),
+  deleteWorkout: (workoutId) => request(`/exerciser/workouts/${workoutId}`, { method: "DELETE" }),
 
   // ---- trainer ----
   clients: () => request("/trainer/clients"),
@@ -93,6 +97,9 @@ export const api = {
     }),
   deleteAssignedWorkout: (exerciserId, assignedId) =>
     request(`/trainer/clients/${exerciserId}/assigned-workouts/${assignedId}`, { method: "DELETE" }),
+  removeClient: (exerciserId, note) =>
+    request(`/trainer/clients/${exerciserId}`, { method: "DELETE", body: { note } }),
+  trainerNotes: () => request("/trainer/notes"),
 
   // ---- admin ----
   adminDashboard: () => request("/admin/dashboard"),

@@ -18,6 +18,10 @@ function Trainer() {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ bodyPart: BODY_PARTS[0].id, exercise: "" });
 
+  const [notes, setNotes] = useState([]);
+  const [showRemoveClient, setShowRemoveClient] = useState(false);
+  const [removeNote, setRemoveNote] = useState("");
+
   useEffect(() => {
     api
       .clients()
@@ -30,6 +34,8 @@ function Trainer() {
         }
       })
       .finally(() => setLoading(false));
+
+    api.trainerNotes().then(setNotes).catch(() => {});
   }, []);
 
   const openClient = (id) => {
@@ -39,6 +45,8 @@ function Trainer() {
     setError("");
     setEditingId(null);
     setClientDetail(null);
+    setShowRemoveClient(false);
+    setRemoveNote("");
     api.clientDetail(id).then(setClientDetail).catch((err) => setError(err.message || "Failed to load client."));
   };
 
@@ -49,6 +57,21 @@ function Trainer() {
     setAssignedMessage("");
     setError("");
     setEditingId(null);
+    setShowRemoveClient(false);
+    setRemoveNote("");
+  };
+
+  const submitRemoveClient = async (e) => {
+    e.preventDefault();
+    if (!removeNote.trim()) return;
+    setError("");
+    try {
+      await api.removeClient(selectedId, removeNote.trim());
+      setClients(await api.clients());
+      goBack();
+    } catch (err) {
+      setError(err.message || "Failed to remove client.");
+    }
   };
 
   const startEdit = (assigned) => {
@@ -146,6 +169,31 @@ function Trainer() {
               <div className="card-subtitle">Goal: {clientDetail.goal}</div>
             </div>
           </div>
+
+          {showRemoveClient ? (
+            <form onSubmit={submitRemoveClient} style={{ marginTop: "12px" }}>
+              <div className="form-group">
+                <label className="form-label">Reason for removing this client</label>
+                <input
+                  className="form-input"
+                  type="text"
+                  placeholder="e.g. Client stopped attending sessions"
+                  value={removeNote}
+                  onChange={(e) => setRemoveNote(e.target.value)}
+                />
+              </div>
+              <div className="row-between">
+                <button className="btn btn-danger" type="submit">Confirm Remove</button>
+                <button className="btn btn-outline" type="button" onClick={() => { setShowRemoveClient(false); setRemoveNote(""); }}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button className="btn btn-outline" type="button" style={{ marginTop: "8px" }} onClick={() => setShowRemoveClient(true)}>
+              Remove Client
+            </button>
+          )}
         </div>
 
         <div className="metric-grid">
@@ -313,6 +361,23 @@ function Trainer() {
           </div>
         </div>
       ))}
+
+      {notes.length > 0 && (
+        <div className="section">
+          <div className="section-title">Client Feedback</div>
+          {notes.map((note, idx) => (
+            <div className="card" key={idx}>
+              <div className="row-between">
+                <div className="card-title">{note.exerciser_name}</div>
+                <span className="card-subtitle">{formatDateLabel(note.created_at.slice(0, 10))}</span>
+              </div>
+              <div className="card-subtitle">
+                {note.author === "exerciser" ? "Left you" : "You removed them"} — {note.note}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
