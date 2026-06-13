@@ -47,7 +47,13 @@ function Trainer() {
     setClientDetail(null);
     setShowRemoveClient(false);
     setRemoveNote("");
-    api.clientDetail(id).then(setClientDetail).catch((err) => setError(err.message || "Failed to load client."));
+    api.clientDetail(id).then(setClientDetail).catch((err) => {
+      if (err.status === 404) {
+        handleClientGone("This client is no longer assigned to you.");
+      } else {
+        setError(err.message || "Failed to load client.");
+      }
+    });
   };
 
   const goBack = () => {
@@ -59,6 +65,12 @@ function Trainer() {
     setEditingId(null);
     setShowRemoveClient(false);
     setRemoveNote("");
+    api.clients().then(setClients).catch(() => {});
+  };
+
+  const handleClientGone = (message) => {
+    goBack();
+    setError(message);
   };
 
   const submitRemoveClient = async (e) => {
@@ -67,10 +79,13 @@ function Trainer() {
     setError("");
     try {
       await api.removeClient(selectedId, removeNote.trim());
-      setClients(await api.clients());
       goBack();
     } catch (err) {
-      setError(err.message || "Failed to remove client.");
+      if (err.status === 404) {
+        handleClientGone("This client is no longer assigned to you.");
+      } else {
+        setError(err.message || "Failed to remove client.");
+      }
     }
   };
 
@@ -97,7 +112,11 @@ function Trainer() {
       setClientDetail(await api.clientDetail(selectedId));
       setEditingId(null);
     } catch (err) {
-      setError(err.message || "Failed to update exercise.");
+      if (err.status === 404) {
+        handleClientGone("This client is no longer assigned to you.");
+      } else {
+        setError(err.message || "Failed to update exercise.");
+      }
     }
   };
 
@@ -108,7 +127,11 @@ function Trainer() {
       setClientDetail(await api.clientDetail(selectedId));
       if (editingId === assignedId) setEditingId(null);
     } catch (err) {
-      setError(err.message || "Failed to remove exercise.");
+      if (err.status === 404) {
+        handleClientGone("This client is no longer assigned to you.");
+      } else {
+        setError(err.message || "Failed to remove exercise.");
+      }
     }
   };
 
@@ -126,7 +149,11 @@ function Trainer() {
       setAssignForm({ bodyPart: BODY_PARTS[0].id, exercise: "" });
       setShowAssign(false);
     } catch (err) {
-      setError(err.message || "Failed to assign workout.");
+      if (err.status === 404) {
+        handleClientGone("This client is no longer assigned to you.");
+      } else {
+        setError(err.message || "Failed to assign workout.");
+      }
     }
   };
 
