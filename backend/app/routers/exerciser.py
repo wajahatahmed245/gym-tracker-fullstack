@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -15,7 +15,6 @@ from ..models import (
     AccountStatus,
     ApprovalStatus,
     AssignedWorkout,
-    BodyPart,
     CardioLog,
     Role,
     TrainerProfile,
@@ -29,13 +28,33 @@ from ..schemas import (
     DashboardOut,
     TrainerListItem,
     TrainerSelect,
-    WorkoutCreate,
+    WorkoutLogCreate,
     WorkoutOut,
 )
 
 router = APIRouter(prefix="/api", tags=["exerciser"])
 
 require_exerciser = require_role(Role.exerciser)
+
+
+def _workout_out(workout: Workout) -> WorkoutOut:
+    return WorkoutOut(
+        id=workout.id,
+        assigned_workout_id=workout.assigned_workout_id,
+        body_part=workout.assigned_workout.body_part,
+        exercise=workout.assigned_workout.exercise,
+        sets=workout.sets,
+        reps=workout.reps,
+        weight=workout.weight,
+        date=workout.date,
+    )
+
+
+def _get_own_assigned_workout_or_404(db: Session, user: User, assigned_id: int) -> AssignedWorkout:
+    assigned = db.get(AssignedWorkout, assigned_id)
+    if assigned is None or assigned.exerciser_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assigned exercise not found")
+    return assigned
 
 
 @router.get("/exerciser/dashboard", response_model=DashboardOut)
@@ -53,15 +72,34 @@ def list_workouts(user: User = Depends(require_exerciser), db: Session = Depends
         .where(Workout.exerciser_id == user.id)
         .order_by(Workout.date.desc(), Workout.id.desc())
     ).scalars().all()
-    return workouts
+    return [_workout_out(w) for w in workouts]
 
 
-@router.post("/exerciser/workouts", response_model=WorkoutOut, status_code=status.HTTP_201_CREATED)
-def log_workout(payload: WorkoutCreate, user: User = Depends(require_exerciser), db: Session = Depends(get_db)):
+@router.get("/exerciser/assigned-workouts", response_model=List[AssignedWorkoutOut])
+def list_assigned_workouts(user: User = Depends(require_exerciser), db: Session = Depends(get_db)):
+    return db.execute(
+        select(AssignedWorkout)
+        .where(AssignedWorkout.exerciser_id == user.id)
+        .order_by(AssignedWorkout.created_at.desc())
+    ).scalars().all()
+
+
+@router.post(
+    "/exerciser/assigned-workouts/{assigned_id}/log",
+    response_model=WorkoutOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def log_assigned_workout(
+    assigned_id: int,
+    payload: WorkoutLogCreate,
+    user: User = Depends(require_exerciser),
+    db: Session = Depends(get_db),
+):
+    assigned = _get_own_assigned_workout_or_404(db, user, assigned_id)
+
     workout = Workout(
         exerciser_id=user.id,
-        body_part=payload.body_part,
-        exercise=payload.exercise,
+        assigned_workout_id=assigned.id,
         sets=payload.sets,
         reps=payload.reps,
         weight=payload.weight,
@@ -72,29 +110,31 @@ def log_workout(payload: WorkoutCreate, user: User = Depends(require_exerciser),
     db.refresh(workout)
 
     logger.info(
-        "Workout logged: exerciser_id=%s body_part=%s exercise=%s",
-        user.id, workout.body_part.value, workout.exercise,
+        "Workout logged: exerciser_id=%s assigned_workout_id=%s exercise=%s",
+        user.id, assigned.id, assigned.exercise,
     )
-    return workout
+    return _workout_out(workout)
 
 
-@router.get("/exerciser/workouts/last", response_model=WorkoutOut)
-def last_workout_for_body_part(
-    body_part: BodyPart = Query(...),
+@router.get("/exerciser/assigned-workouts/{assigned_id}/last", response_model=WorkoutOut)
+def last_log_for_assigned_workout(
+    assigned_id: int,
     user: User = Depends(require_exerciser),
     db: Session = Depends(get_db),
 ):
+    assigned = _get_own_assigned_workout_or_404(db, user, assigned_id)
+
     workout = db.execute(
         select(Workout)
-        .where(Workout.exerciser_id == user.id, Workout.body_part == body_part)
+        .where(Workout.assigned_workout_id == assigned.id)
         .order_by(Workout.date.desc(), Workout.id.desc())
         .limit(1)
     ).scalars().first()
 
     if workout is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No previous session for this body part")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No previous session for this exercise")
 
-    return workout
+    return _workout_out(workout)
 
 
 @router.get("/exerciser/cardio", response_model=List[CardioOut])
@@ -119,15 +159,6 @@ def log_cardio(payload: CardioCreate, user: User = Depends(require_exerciser), d
         user.id, cardio.activity.value, cardio.duration_minutes,
     )
     return cardio
-
-
-@router.get("/exerciser/assigned-workouts", response_model=List[AssignedWorkoutOut])
-def list_assigned_workouts(user: User = Depends(require_exerciser), db: Session = Depends(get_db)):
-    return db.execute(
-        select(AssignedWorkout)
-        .where(AssignedWorkout.exerciser_id == user.id)
-        .order_by(AssignedWorkout.created_at.desc())
-    ).scalars().all()
 
 
 @router.get("/trainers", response_model=List[TrainerListItem])

@@ -14,6 +14,7 @@ from ..models import AssignedWorkout, ExerciserProfile, User, Workout
 from ..schemas import (
     AssignWorkoutCreate,
     AssignedWorkoutOut,
+    AssignedWorkoutUpdate,
     ClientDetailOut,
     ClientOut,
     RecentWorkoutItem,
@@ -31,6 +32,13 @@ def _get_client_or_404(db: Session, trainer: User, exerciser_id: int) -> User:
     ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
     return client
+
+
+def _get_client_assigned_workout_or_404(db: Session, client: User, assigned_id: int) -> AssignedWorkout:
+    assigned = db.get(AssignedWorkout, assigned_id)
+    if assigned is None or assigned.exerciser_id != client.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assigned exercise not found")
+    return assigned
 
 
 @router.get("/clients", response_model=List[ClientOut])
@@ -75,14 +83,12 @@ def client_detail(
         select(AssignedWorkout)
         .where(AssignedWorkout.exerciser_id == client.id)
         .order_by(AssignedWorkout.created_at.desc())
-        .limit(20)
     ).scalars().all()
 
-    recent: List[RecentWorkoutItem] = [
+    recent = [
         RecentWorkoutItem(
-            kind="logged",
-            body_part=w.body_part,
-            exercise=w.exercise,
+            body_part=w.assigned_workout.body_part,
+            exercise=w.assigned_workout.exercise,
             date=w.date,
             sets=w.sets,
             reps=w.reps,
@@ -90,17 +96,7 @@ def client_detail(
             created_at=w.created_at,
         )
         for w in workouts
-    ] + [
-        RecentWorkoutItem(
-            kind="assigned",
-            body_part=a.body_part,
-            exercise=a.exercise,
-            created_at=a.created_at,
-        )
-        for a in assigned
     ]
-    recent.sort(key=lambda item: item.created_at, reverse=True)
-    recent = recent[:20]
 
     dates = crud.get_workout_dates(db, client.id)
 
@@ -110,6 +106,7 @@ def client_detail(
         goal=client.exerciser_profile.goal,
         total_workouts=len(dates),
         streak=crud.compute_streak(dates),
+        assigned_workouts=assigned,
         recent_workouts=recent,
     )
 
@@ -142,3 +139,54 @@ def assign_workout(
         trainer.id, client.id, assigned.body_part.value, assigned.exercise,
     )
     return assigned
+
+
+@router.patch(
+    "/clients/{exerciser_id}/assigned-workouts/{assigned_id}",
+    response_model=AssignedWorkoutOut,
+)
+def update_assigned_workout(
+    exerciser_id: int,
+    assigned_id: int,
+    payload: AssignedWorkoutUpdate,
+    trainer: User = Depends(require_approved_trainer),
+    db: Session = Depends(get_db),
+):
+    client = _get_client_or_404(db, trainer, exerciser_id)
+    assigned = _get_client_assigned_workout_or_404(db, client, assigned_id)
+
+    if payload.body_part is not None:
+        assigned.body_part = payload.body_part
+    if payload.exercise is not None:
+        assigned.exercise = payload.exercise
+
+    db.commit()
+    db.refresh(assigned)
+
+    logger.info(
+        "Trainer id=%s updated assigned_workout_id=%s for exerciser_id=%s: body_part=%s exercise=%s",
+        trainer.id, assigned.id, client.id, assigned.body_part.value, assigned.exercise,
+    )
+    return assigned
+
+
+@router.delete(
+    "/clients/{exerciser_id}/assigned-workouts/{assigned_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_assigned_workout(
+    exerciser_id: int,
+    assigned_id: int,
+    trainer: User = Depends(require_approved_trainer),
+    db: Session = Depends(get_db),
+):
+    client = _get_client_or_404(db, trainer, exerciser_id)
+    assigned = _get_client_assigned_workout_or_404(db, client, assigned_id)
+
+    db.delete(assigned)
+    db.commit()
+
+    logger.info(
+        "Trainer id=%s removed assigned_workout_id=%s for exerciser_id=%s",
+        trainer.id, assigned_id, client.id,
+    )

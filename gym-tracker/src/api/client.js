@@ -71,12 +71,12 @@ export const api = {
   // ---- exerciser ----
   dashboard: () => request("/exerciser/dashboard"),
   listWorkouts: () => request("/exerciser/workouts"),
-  logWorkout: (payload) => request("/exerciser/workouts", { method: "POST", body: payload }),
-  lastWorkout: (bodyPart) =>
-    request(`/exerciser/workouts/last?body_part=${encodeURIComponent(bodyPart)}`),
   listCardio: () => request("/exerciser/cardio"),
   logCardio: (payload) => request("/exerciser/cardio", { method: "POST", body: payload }),
   assignedWorkouts: () => request("/exerciser/assigned-workouts"),
+  logAssignedWorkout: (assignedId, payload) =>
+    request(`/exerciser/assigned-workouts/${assignedId}/log`, { method: "POST", body: payload }),
+  lastWorkoutFor: (assignedId) => request(`/exerciser/assigned-workouts/${assignedId}/last`),
   listTrainers: () => request("/trainers"),
   selectTrainer: (trainerId) =>
     request("/exerciser/trainer", { method: "PATCH", body: { trainer_id: trainerId } }),
@@ -86,6 +86,13 @@ export const api = {
   clientDetail: (id) => request(`/trainer/clients/${id}`),
   assignWorkout: (id, payload) =>
     request(`/trainer/clients/${id}/assign-workout`, { method: "POST", body: payload }),
+  updateAssignedWorkout: (exerciserId, assignedId, payload) =>
+    request(`/trainer/clients/${exerciserId}/assigned-workouts/${assignedId}`, {
+      method: "PATCH",
+      body: payload,
+    }),
+  deleteAssignedWorkout: (exerciserId, assignedId) =>
+    request(`/trainer/clients/${exerciserId}/assigned-workouts/${assignedId}`, { method: "DELETE" }),
 
   // ---- admin ----
   adminDashboard: () => request("/admin/dashboard"),

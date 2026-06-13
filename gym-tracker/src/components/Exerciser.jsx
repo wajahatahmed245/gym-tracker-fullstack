@@ -23,16 +23,11 @@ function Exerciser({ user, onUserChange }) {
   const [cardioLogs, setCardioLogs] = useState([]);
   const [assignedWorkouts, setAssignedWorkouts] = useState([]);
   const [trainers, setTrainers] = useState([]);
-  const [lastSession, setLastSession] = useState(null);
   const [trainerError, setTrainerError] = useState("");
 
-  const [workoutForm, setWorkoutForm] = useState({
-    bodyPart: BODY_PARTS[0].id,
-    exercise: "",
-    sets: "",
-    reps: "",
-    weight: "",
-  });
+  const [expandedId, setExpandedId] = useState(null);
+  const [logForm, setLogForm] = useState({ sets: "", reps: "", weight: "" });
+  const [lastSessions, setLastSessions] = useState({});
 
   const [cardioForm, setCardioForm] = useState({
     activity: CARDIO_TYPES[0].id,
@@ -71,21 +66,23 @@ function Exerciser({ user, onUserChange }) {
   }, []);
 
   useEffect(() => {
-    if (screen !== "log-workout") return;
+    if (screen !== "home" && screen !== "my-exercises") return;
     let cancelled = false;
-    api
-      .lastWorkout(workoutForm.bodyPart)
-      .then((data) => {
-        if (!cancelled) setLastSession(data);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        if (err.status === 404) setLastSession(null);
-      });
+    const interval = setInterval(() => {
+      api
+        .assignedWorkouts()
+        .then((aw) => {
+          if (cancelled) return;
+          setAssignedWorkouts(aw);
+          setExpandedId((current) => (current && !aw.some((w) => w.id === current) ? null : current));
+        })
+        .catch(() => {});
+    }, 8000);
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
-  }, [screen, workoutForm.bodyPart]);
+  }, [screen]);
 
   const goHome = () => {
     setSavedMessage("");
@@ -93,38 +90,52 @@ function Exerciser({ user, onUserChange }) {
     setScreen("home");
   };
 
-  const handleWorkoutChange = (field, value) => {
-    setWorkoutForm({ ...workoutForm, [field]: value });
-  };
-
   const handleCardioChange = (field, value) => {
     setCardioForm({ ...cardioForm, [field]: value });
   };
 
-  const submitWorkout = async (e) => {
+  const handleLogChange = (field, value) => {
+    setLogForm({ ...logForm, [field]: value });
+  };
+
+  const toggleExpand = (assigned) => {
+    setError("");
+    setSavedMessage("");
+    if (expandedId === assigned.id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(assigned.id);
+    setLogForm({ sets: "", reps: "", weight: "" });
+    if (!(assigned.id in lastSessions)) {
+      api
+        .lastWorkoutFor(assigned.id)
+        .then((data) => setLastSessions((prev) => ({ ...prev, [assigned.id]: data })))
+        .catch((err) => {
+          if (err.status === 404) setLastSessions((prev) => ({ ...prev, [assigned.id]: null }));
+        });
+    }
+  };
+
+  const submitLog = async (e, assigned) => {
     e.preventDefault();
-    if (!workoutForm.exercise || !workoutForm.sets || !workoutForm.reps || !workoutForm.weight) {
+    if (!logForm.sets || !logForm.reps || !logForm.weight) {
       return;
     }
     setError("");
     try {
-      await api.logWorkout({
-        body_part: workoutForm.bodyPart,
-        exercise: workoutForm.exercise,
-        sets: Number(workoutForm.sets),
-        reps: Number(workoutForm.reps),
-        weight: Number(workoutForm.weight),
+      const logged = await api.logAssignedWorkout(assigned.id, {
+        sets: Number(logForm.sets),
+        reps: Number(logForm.reps),
+        weight: Number(logForm.weight),
       });
       const [dash, w] = await Promise.all([api.dashboard(), api.listWorkouts()]);
       setDashboard(dash);
       setWorkouts(w);
-      try {
-        setLastSession(await api.lastWorkout(workoutForm.bodyPart));
-      } catch (err) {
-        if (err.status === 404) setLastSession(null);
-      }
+      setLastSessions((prev) => ({ ...prev, [assigned.id]: logged }));
       setSavedMessage("Workout logged successfully!");
-      setWorkoutForm({ bodyPart: workoutForm.bodyPart, exercise: "", sets: "", reps: "", weight: "" });
+      setLogForm({ sets: "", reps: "", weight: "" });
+      setExpandedId(null);
     } catch (err) {
       setError(err.message || "Failed to log workout.");
     }
@@ -191,8 +202,8 @@ function Exerciser({ user, onUserChange }) {
         <div className="section">
           <div className="section-title">Quick Actions</div>
           <div className="quick-actions">
-            <button className="btn btn-primary" onClick={() => setScreen("log-workout")}>
-              💪 Log Workout
+            <button className="btn btn-primary" onClick={() => setScreen("my-exercises")}>
+              💪 My Exercises
             </button>
             <button className="btn btn-outline" onClick={() => setScreen("log-cardio")}>
               🏃 Log Cardio
@@ -209,97 +220,97 @@ function Exerciser({ user, onUserChange }) {
     );
   }
 
-  if (screen === "log-workout") {
+  if (screen === "my-exercises") {
+    const grouped = assignedWorkouts.reduce((groups, w) => {
+      if (!groups[w.body_part]) groups[w.body_part] = [];
+      groups[w.body_part].push(w);
+      return groups;
+    }, {});
+
     return (
       <div>
         <div className="screen-header">
           <button className="back-button" onClick={goHome}>←</button>
-          <span className="screen-title">Log Workout</span>
+          <span className="screen-title">My Exercises</span>
         </div>
 
         {error && <div className="auth-error">{error}</div>}
+        {savedMessage && <div className="success-box">{savedMessage}</div>}
 
-        <form onSubmit={submitWorkout}>
-          <div className="form-group">
-            <label className="form-label">Body Part</label>
-            <div className="chip-row">
-              {BODY_PARTS.map((part) => (
-                <button
-                  key={part.id}
-                  type="button"
-                  className={`chip ${workoutForm.bodyPart === part.id ? "active" : ""}`}
-                  onClick={() => handleWorkoutChange("bodyPart", part.id)}
-                >
-                  <span className="chip-icon">{part.icon}</span>
-                  <span>{part.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Exercise Name</label>
-            <input
-              className="form-input"
-              type="text"
-              placeholder="e.g. Bench press"
-              value={workoutForm.exercise}
-              onChange={(e) => handleWorkoutChange("exercise", e.target.value)}
-            />
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Sets</label>
-              <input
-                className="form-input"
-                type="number"
-                min="1"
-                placeholder="4"
-                value={workoutForm.sets}
-                onChange={(e) => handleWorkoutChange("sets", e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Reps</label>
-              <input
-                className="form-input"
-                type="number"
-                min="1"
-                placeholder="8"
-                value={workoutForm.reps}
-                onChange={(e) => handleWorkoutChange("reps", e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Weight (kg)</label>
-            <input
-              className="form-input"
-              type="number"
-              min="0"
-              placeholder="80"
-              value={workoutForm.weight}
-              onChange={(e) => handleWorkoutChange("weight", e.target.value)}
-            />
-          </div>
-
-          <button className="btn btn-primary" type="submit">Save Workout</button>
-        </form>
-
-        {lastSession && (
-          <div className="info-box">
-            <div className="info-box-title">Last Session ({bodyPartMeta(lastSession.body_part)?.label})</div>
-            <div>
-              {formatDateLabel(lastSession.date)} — {lastSession.exercise}: {lastSession.weight}kg x{lastSession.reps} ({lastSession.sets} sets)
-            </div>
-          </div>
+        {assignedWorkouts.length === 0 && (
+          <div className="info-box">Your trainer hasn't assigned any exercises yet.</div>
         )}
 
-        {savedMessage && screen === "log-workout" && (
-          <div className="success-box">{savedMessage}</div>
-        )}
+        {BODY_PARTS.filter((part) => grouped[part.id]).map((part) => (
+          <div className="section" key={part.id}>
+            <div className="section-title">{part.icon} {part.label}</div>
+            {grouped[part.id].map((assigned) => {
+              const last = lastSessions[assigned.id];
+              return (
+                <div className="card" key={assigned.id}>
+                  <div className="row-between">
+                    <div className="card-title">{assigned.exercise}</div>
+                    <button className="btn btn-outline" type="button" onClick={() => toggleExpand(assigned)}>
+                      {expandedId === assigned.id ? "Close" : "Log Today"}
+                    </button>
+                  </div>
+
+                  {expandedId === assigned.id && (
+                    <form onSubmit={(e) => submitLog(e, assigned)}>
+                      {last && (
+                        <div className="card-subtitle">
+                          Last: {formatDateLabel(last.date)} — {last.weight}kg x{last.reps} ({last.sets} sets)
+                        </div>
+                      )}
+                      {last === null && (
+                        <div className="card-subtitle">No previous session yet.</div>
+                      )}
+
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label className="form-label">Sets</label>
+                          <input
+                            className="form-input"
+                            type="number"
+                            min="1"
+                            placeholder="4"
+                            value={logForm.sets}
+                            onChange={(e) => handleLogChange("sets", e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Reps</label>
+                          <input
+                            className="form-input"
+                            type="number"
+                            min="1"
+                            placeholder="8"
+                            value={logForm.reps}
+                            onChange={(e) => handleLogChange("reps", e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Weight (kg)</label>
+                        <input
+                          className="form-input"
+                          type="number"
+                          min="0"
+                          placeholder="80"
+                          value={logForm.weight}
+                          onChange={(e) => handleLogChange("weight", e.target.value)}
+                        />
+                      </div>
+
+                      <button className="btn btn-primary" type="submit">Save</button>
+                    </form>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     );
   }
@@ -434,26 +445,6 @@ function Exerciser({ user, onUserChange }) {
         ) : (
           <div className="info-box">You haven't selected a trainer yet.</div>
         )}
-
-        <div className="section">
-          <div className="section-title">Assigned Workouts</div>
-          {assignedWorkouts.length === 0 && (
-            <div className="card-subtitle">No assigned workouts yet.</div>
-          )}
-          {assignedWorkouts.map((w) => {
-            const meta = bodyPartMeta(w.body_part);
-            return (
-              <div className="card" key={w.id}>
-                <div className="row-between">
-                  <div className="card-title">{w.exercise}</div>
-                  <span className={`tag ${meta.tagClass}`}>
-                    {meta.icon} {meta.label}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
 
         <div className="section">
           <div className="section-title">{currentTrainer ? "Switch Trainer" : "Choose a Trainer"}</div>

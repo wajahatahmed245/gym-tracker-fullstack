@@ -15,6 +15,9 @@ function Trainer() {
   const [assignForm, setAssignForm] = useState({ bodyPart: BODY_PARTS[0].id, exercise: "" });
   const [assignedMessage, setAssignedMessage] = useState("");
 
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ bodyPart: BODY_PARTS[0].id, exercise: "" });
+
   useEffect(() => {
     api
       .clients()
@@ -34,6 +37,7 @@ function Trainer() {
     setShowAssign(false);
     setAssignedMessage("");
     setError("");
+    setEditingId(null);
     setClientDetail(null);
     api.clientDetail(id).then(setClientDetail).catch((err) => setError(err.message || "Failed to load client."));
   };
@@ -44,6 +48,45 @@ function Trainer() {
     setShowAssign(false);
     setAssignedMessage("");
     setError("");
+    setEditingId(null);
+  };
+
+  const startEdit = (assigned) => {
+    setError("");
+    setAssignedMessage("");
+    setEditingId(assigned.id);
+    setEditForm({ bodyPart: assigned.body_part, exercise: assigned.exercise });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+  };
+
+  const submitEdit = async (e, assignedId) => {
+    e.preventDefault();
+    if (!editForm.exercise) return;
+    setError("");
+    try {
+      await api.updateAssignedWorkout(selectedId, assignedId, {
+        body_part: editForm.bodyPart,
+        exercise: editForm.exercise,
+      });
+      setClientDetail(await api.clientDetail(selectedId));
+      setEditingId(null);
+    } catch (err) {
+      setError(err.message || "Failed to update exercise.");
+    }
+  };
+
+  const removeAssigned = async (assignedId) => {
+    setError("");
+    try {
+      await api.deleteAssignedWorkout(selectedId, assignedId);
+      setClientDetail(await api.clientDetail(selectedId));
+      if (editingId === assignedId) setEditingId(null);
+    } catch (err) {
+      setError(err.message || "Failed to remove exercise.");
+    }
   };
 
   const submitAssign = async (e) => {
@@ -117,27 +160,83 @@ function Trainer() {
         </div>
 
         <div className="section">
-          <div className="section-title">Recent Workouts</div>
+          <div className="section-title">Assigned Exercises</div>
+          {clientDetail.assigned_workouts.length === 0 && (
+            <div className="card-subtitle">No exercises assigned yet.</div>
+          )}
+          {clientDetail.assigned_workouts.map((assigned) => {
+            const meta = bodyPartMeta(assigned.body_part);
+            return (
+              <div className="card" key={assigned.id}>
+                {editingId === assigned.id ? (
+                  <form onSubmit={(e) => submitEdit(e, assigned.id)}>
+                    <div className="form-group">
+                      <label className="form-label">Body Part</label>
+                      <div className="chip-row">
+                        {BODY_PARTS.map((part) => (
+                          <button
+                            key={part.id}
+                            type="button"
+                            className={`chip ${editForm.bodyPart === part.id ? "active" : ""}`}
+                            onClick={() => setEditForm({ ...editForm, bodyPart: part.id })}
+                          >
+                            <span className="chip-icon">{part.icon}</span>
+                            <span>{part.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Exercise</label>
+                      <input
+                        className="form-input"
+                        type="text"
+                        value={editForm.exercise}
+                        onChange={(e) => setEditForm({ ...editForm, exercise: e.target.value })}
+                      />
+                    </div>
+                    <div className="row-between">
+                      <button className="btn btn-success" type="submit">Save</button>
+                      <button className="btn btn-outline" type="button" onClick={cancelEdit}>Cancel</button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="row-between">
+                    <div className="card-title">{assigned.exercise}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span className={`tag ${meta.tagClass}`}>
+                        {meta.icon} {meta.label}
+                      </span>
+                      <button className="btn btn-outline" type="button" onClick={() => startEdit(assigned)}>Edit</button>
+                      <button className="btn btn-outline" type="button" onClick={() => removeAssigned(assigned.id)}>Remove</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="section">
+          <div className="section-title">Recent Workout Logs</div>
           {clientDetail.recent_workouts.length === 0 && (
             <div className="card-subtitle">No activity yet.</div>
           )}
           {clientDetail.recent_workouts.map((item, idx) => {
             const meta = bodyPartMeta(item.body_part);
-            const title =
-              item.kind === "logged"
-                ? `${item.exercise}: ${item.weight}kg x${item.reps} (${item.sets} sets)`
-                : `Assigned: ${item.exercise}`;
             return (
               <div className="card" key={idx}>
                 <div className="row-between">
-                  <div className="card-title">{title}</div>
+                  <div className="card-title">
+                    {item.exercise}: {item.weight}kg x{item.reps} ({item.sets} sets)
+                  </div>
                   {meta && (
                     <span className={`tag ${meta.tagClass}`}>
                       {meta.icon} {meta.label}
                     </span>
                   )}
                 </div>
-                {item.date && <div className="card-subtitle">{formatDateLabel(item.date)}</div>}
+                <div className="card-subtitle">{formatDateLabel(item.date)}</div>
               </div>
             );
           })}
@@ -145,7 +244,7 @@ function Trainer() {
 
         <div className="section">
           <button className="btn btn-primary" onClick={() => setShowAssign(!showAssign)}>
-            ➕ Assign New Workout
+            ➕ Assign New Exercise
           </button>
         </div>
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 from datetime import date, datetime
-from typing import Optional
+from typing import List, Optional
 
 from sqlalchemy import (
     Date,
@@ -127,13 +127,16 @@ class Workout(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     exerciser_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    body_part: Mapped[BodyPart] = mapped_column(Enum(BodyPart), nullable=False)
-    exercise: Mapped[str] = mapped_column(String(120), nullable=False)
+    assigned_workout_id: Mapped[int] = mapped_column(
+        ForeignKey("assigned_workouts.id"), nullable=False, index=True
+    )
     sets: Mapped[int] = mapped_column(Integer, nullable=False)
     reps: Mapped[int] = mapped_column(Integer, nullable=False)
     weight: Mapped[float] = mapped_column(Float, nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    assigned_workout: Mapped["AssignedWorkout"] = relationship("AssignedWorkout", back_populates="logs")
 
 
 class AssignedWorkout(Base):
@@ -145,6 +148,13 @@ class AssignedWorkout(Base):
     body_part: Mapped[BodyPart] = mapped_column(Enum(BodyPart), nullable=False)
     exercise: Mapped[str] = mapped_column(String(120), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    logs: Mapped[List["Workout"]] = relationship(
+        "Workout", back_populates="assigned_workout", cascade="all, delete-orphan"
+    )
 
 
 class CardioLog(Base):

@@ -85,9 +85,7 @@ class DashboardOut(BaseModel):
     days_since_last_workout: Optional[int] = None
 
 
-class WorkoutCreate(BaseModel):
-    body_part: BodyPart
-    exercise: str = Field(min_length=1, max_length=120)
+class WorkoutLogCreate(BaseModel):
     sets: int = Field(gt=0)
     reps: int = Field(gt=0)
     weight: float = Field(ge=0)
@@ -95,9 +93,8 @@ class WorkoutCreate(BaseModel):
 
 
 class WorkoutOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
+    assigned_workout_id: int
     body_part: BodyPart
     exercise: str
     sets: int
@@ -128,6 +125,7 @@ class AssignedWorkoutOut(BaseModel):
     body_part: BodyPart
     exercise: str
     created_at: datetime
+    updated_at: datetime
 
 
 class TrainerListItem(BaseModel):
@@ -155,13 +153,12 @@ class ClientOut(BaseModel):
 
 
 class RecentWorkoutItem(BaseModel):
-    kind: str  # "logged" | "assigned"
     body_part: BodyPart
     exercise: str
-    date: Optional[date_type] = None
-    sets: Optional[int] = None
-    reps: Optional[int] = None
-    weight: Optional[float] = None
+    date: date_type
+    sets: int
+    reps: int
+    weight: float
     created_at: datetime
 
 
@@ -171,12 +168,18 @@ class ClientDetailOut(BaseModel):
     goal: Goal
     total_workouts: int
     streak: int
+    assigned_workouts: List[AssignedWorkoutOut]
     recent_workouts: List[RecentWorkoutItem]
 
 
 class AssignWorkoutCreate(BaseModel):
     body_part: BodyPart
     exercise: str = Field(min_length=1, max_length=120)
+
+
+class AssignedWorkoutUpdate(BaseModel):
+    body_part: Optional[BodyPart] = None
+    exercise: Optional[str] = Field(default=None, min_length=1, max_length=120)
 
 
 # ---------- Admin ----------
