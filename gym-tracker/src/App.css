@@ -531,7 +531,9 @@ body {
   border-radius: var(--radius-sm);
   padding: 12px 14px;
   margin-top: 16px;
+  margin-bottom: 16px;
   font-size: 13px;
+  line-height: 1.5;
   color: #1a4d8f;
 }
 
