@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 import AccountActions from "./AccountActions";
 import { initialsFor } from "../utils/format";
 import { api } from "../api/client";
+import { screenTransition, cardTransition, tapScale } from "../utils/motion";
 
 const USER_FILTERS = ["All", "active", "inactive"];
 
@@ -103,18 +105,26 @@ function Admin() {
   };
 
   if (loading) {
-    return <div className="loading-screen">Loading…</div>;
+    return (
+      <motion.div className="loading-screen" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        Loading…
+      </motion.div>
+    );
   }
 
   if (screen === "user-detail" && selectedUser) {
     return (
-      <div>
+      <motion.div {...screenTransition}>
         <div className="screen-header">
           <button className="back-button" onClick={() => setScreen("users")}>←</button>
           <span className="screen-title">{selectedUser.name}</span>
         </div>
 
-        {error && <div className="auth-error">{error}</div>}
+        {error && (
+          <motion.div className="auth-error" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {error}
+          </motion.div>
+        )}
 
         <div className="card">
           <div className="card-row">
@@ -130,12 +140,13 @@ function Admin() {
           </div>
         </div>
 
-        <button
+        <motion.button
           className={`btn ${selectedUser.status === "active" ? "btn-danger" : "btn-success"}`}
+          whileTap={tapScale}
           onClick={() => toggleUserStatus(selectedUser.id, selectedUser.status)}
         >
           {selectedUser.status === "active" ? "Deactivate User" : "Activate User"}
-        </button>
+        </motion.button>
 
         <AccountActions
           name={selectedUser.name}
@@ -143,19 +154,23 @@ function Admin() {
           onChangePassword={(newPassword) => api.resetUserPassword(selectedUser.id, newPassword)}
           onDelete={() => deleteUser(selectedUser.id)}
         />
-      </div>
+      </motion.div>
     );
   }
 
   if (screen === "trainer-detail" && selectedTrainer) {
     return (
-      <div>
+      <motion.div {...screenTransition}>
         <div className="screen-header">
           <button className="back-button" onClick={() => setScreen("trainers")}>←</button>
           <span className="screen-title">{selectedTrainer.name}</span>
         </div>
 
-        {error && <div className="auth-error">{error}</div>}
+        {error && (
+          <motion.div className="auth-error" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {error}
+          </motion.div>
+        )}
 
         <div className="card">
           <div className="card-row">
@@ -182,22 +197,23 @@ function Admin() {
 
         {selectedTrainer.approval_status === "pending" && (
           <div className="action-row">
-            <button className="btn btn-success" onClick={() => approveTrainer(selectedTrainer.id)}>
+            <motion.button className="btn btn-success" whileTap={tapScale} onClick={() => approveTrainer(selectedTrainer.id)}>
               Approve
-            </button>
-            <button className="btn btn-danger" onClick={() => rejectTrainer(selectedTrainer.id)}>
+            </motion.button>
+            <motion.button className="btn btn-danger" whileTap={tapScale} onClick={() => rejectTrainer(selectedTrainer.id)}>
               Reject
-            </button>
+            </motion.button>
           </div>
         )}
 
         {selectedTrainer.approval_status === "approved" && (
-          <button
+          <motion.button
             className={`btn ${selectedTrainer.status === "active" ? "btn-danger" : "btn-success"}`}
+            whileTap={tapScale}
             onClick={() => toggleTrainerActive(selectedTrainer.id, selectedTrainer.status)}
           >
             {selectedTrainer.status === "active" ? "Deactivate Trainer" : "Activate Trainer"}
-          </button>
+          </motion.button>
         )}
 
         <AccountActions
@@ -206,19 +222,23 @@ function Admin() {
           onChangePassword={(newPassword) => api.resetTrainerPassword(selectedTrainer.id, newPassword)}
           onDelete={() => deleteTrainer(selectedTrainer.id)}
         />
-      </div>
+      </motion.div>
     );
   }
 
   if (screen === "users") {
     return (
-      <div>
+      <motion.div {...screenTransition}>
         <div className="screen-header">
           <button className="back-button" onClick={() => setScreen("dashboard")}>←</button>
           <span className="screen-title">Users Management</span>
         </div>
 
-        {error && <div className="auth-error">{error}</div>}
+        {error && (
+          <motion.div className="auth-error" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {error}
+          </motion.div>
+        )}
 
         <div className="filter-tabs">
           {USER_FILTERS.map((filter) => (
@@ -232,10 +252,12 @@ function Admin() {
           ))}
         </div>
 
-        {filteredUsers.map((user) => (
-          <div
+        {filteredUsers.map((user, idx) => (
+          <motion.div
             className="card clickable"
             key={user.id}
+            {...cardTransition(idx)}
+            whileTap={tapScale}
             onClick={() => {
               setSelectedUserId(user.id);
               setScreen("user-detail");
@@ -252,28 +274,34 @@ function Admin() {
               </span>
               <span className="chevron">›</span>
             </div>
-          </div>
+          </motion.div>
         ))}
 
         {filteredUsers.length === 0 && <div className="empty-text">No users found.</div>}
-      </div>
+      </motion.div>
     );
   }
 
   if (screen === "trainers") {
     return (
-      <div>
+      <motion.div {...screenTransition}>
         <div className="screen-header">
           <button className="back-button" onClick={() => setScreen("dashboard")}>←</button>
           <span className="screen-title">Trainers Management</span>
         </div>
 
-        {error && <div className="auth-error">{error}</div>}
+        {error && (
+          <motion.div className="auth-error" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {error}
+          </motion.div>
+        )}
 
-        {trainers.map((trainer) => (
-          <div
+        {trainers.map((trainer, idx) => (
+          <motion.div
             className="card clickable"
             key={trainer.id}
+            {...cardTransition(idx)}
+            whileTap={tapScale}
             onClick={() => {
               setSelectedTrainerId(trainer.id);
               setScreen("trainer-detail");
@@ -297,19 +325,23 @@ function Admin() {
                 </span>
               </div>
             )}
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div>
+    <motion.div {...screenTransition}>
       <div className="screen-header">
         <span className="screen-title">Admin Dashboard</span>
       </div>
 
-      {error && <div className="auth-error">{error}</div>}
+      {error && (
+        <motion.div className="auth-error" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+          {error}
+        </motion.div>
+      )}
 
       <div className="metric-grid">
         <div className="metric-card">
@@ -333,15 +365,15 @@ function Admin() {
       <div className="section">
         <div className="section-title">Quick Actions</div>
         <div className="quick-actions">
-          <button className="btn btn-primary" onClick={() => setScreen("users")}>
+          <motion.button className="btn btn-primary" whileTap={tapScale} onClick={() => setScreen("users")}>
             👥 Manage Users
-          </button>
-          <button className="btn btn-outline" onClick={() => setScreen("trainers")}>
+          </motion.button>
+          <motion.button className="btn btn-outline" whileTap={tapScale} onClick={() => setScreen("trainers")}>
             🧑‍🏫 Manage Trainers
-          </button>
+          </motion.button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 

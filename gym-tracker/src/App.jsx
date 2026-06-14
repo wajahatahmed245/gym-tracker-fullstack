@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import AppHeader from "./components/AppHeader";
 import Login from "./components/Login";
 import SignupExerciser from "./components/SignupExerciser";
@@ -7,6 +8,7 @@ import Exerciser from "./components/Exerciser";
 import Trainer from "./components/Trainer";
 import Admin from "./components/Admin";
 import { api, getToken, setToken } from "./api/client";
+import { tabContent } from "./utils/motion";
 import "./App.css";
 
 function App() {
@@ -47,7 +49,9 @@ function App() {
   if (loading) {
     return (
       <div className="app">
-        <div className="loading-screen">Loading…</div>
+        <motion.div className="loading-screen" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          Loading…
+        </motion.div>
       </div>
     );
   }
@@ -55,13 +59,23 @@ function App() {
   if (!user) {
     return (
       <div className="app">
-        {authView === "signup-exerciser" && (
-          <SignupExerciser onSignup={handleAuthSuccess} onBack={() => setAuthView("login")} />
-        )}
-        {authView === "signup-trainer" && (
-          <SignupTrainer onSignup={handleAuthSuccess} onBack={() => setAuthView("login")} />
-        )}
-        {authView === "login" && <Login onLogin={handleAuthSuccess} onNavigate={setAuthView} />}
+        <AnimatePresence mode="wait">
+          {authView === "signup-exerciser" && (
+            <motion.div key="signup-exerciser" {...tabContent}>
+              <SignupExerciser onSignup={handleAuthSuccess} onBack={() => setAuthView("login")} />
+            </motion.div>
+          )}
+          {authView === "signup-trainer" && (
+            <motion.div key="signup-trainer" {...tabContent}>
+              <SignupTrainer onSignup={handleAuthSuccess} onBack={() => setAuthView("login")} />
+            </motion.div>
+          )}
+          {authView === "login" && (
+            <motion.div key="login" {...tabContent}>
+              <Login onLogin={handleAuthSuccess} onNavigate={setAuthView} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }

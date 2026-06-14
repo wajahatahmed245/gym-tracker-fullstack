@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 import { BODY_PARTS, bodyPartMeta } from "../utils/bodyParts";
 import { formatDateLabel, formatJoinedDate, initialsFor } from "../utils/format";
 import { BMI_CATEGORY_CLASS } from "../utils/health";
 import { api } from "../api/client";
+import { screenTransition, cardTransition, tapScale } from "../utils/motion";
 
 function Trainer() {
   const [clients, setClients] = useState([]);
@@ -185,12 +187,16 @@ function Trainer() {
   };
 
   if (loading) {
-    return <div className="loading-screen">Loading…</div>;
+    return (
+      <motion.div className="loading-screen" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        Loading…
+      </motion.div>
+    );
   }
 
   if (pending) {
     return (
-      <div>
+      <motion.div {...screenTransition}>
         <div className="hero-card">
           <div className="hero-greeting">👥 My Clients</div>
           <div className="hero-subtitle">Your trainer account is awaiting approval</div>
@@ -198,23 +204,31 @@ function Trainer() {
         <div className="info-box">
           Your trainer account is pending admin approval. You'll be able to see your clients once approved.
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   if (selectedId) {
     if (!clientDetail) {
-      return <div className="loading-screen">Loading…</div>;
+      return (
+        <motion.div className="loading-screen" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          Loading…
+        </motion.div>
+      );
     }
 
     return (
-      <div>
+      <motion.div {...screenTransition}>
         <div className="screen-header">
           <button className="back-button" onClick={goBack}>←</button>
           <span className="screen-title">{clientDetail.name}</span>
         </div>
 
-        {error && <div className="auth-error">{error}</div>}
+        {error && (
+          <motion.div className="auth-error" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {error}
+          </motion.div>
+        )}
 
         <div className="card">
           <div className="card-row">
@@ -250,9 +264,9 @@ function Trainer() {
               </div>
             </form>
           ) : (
-            <button className="btn btn-outline" type="button" style={{ marginTop: "8px" }} onClick={() => setShowRemoveClient(true)}>
+            <motion.button className="btn btn-outline" type="button" style={{ marginTop: "8px" }} whileTap={tapScale} onClick={() => setShowRemoveClient(true)}>
               Remove Client
-            </button>
+            </motion.button>
           )}
         </div>
 
@@ -309,10 +323,10 @@ function Trainer() {
           {clientDetail.assigned_workouts.length === 0 && (
             <div className="card-subtitle">No exercises assigned yet.</div>
           )}
-          {clientDetail.assigned_workouts.map((assigned) => {
+          {clientDetail.assigned_workouts.map((assigned, idx) => {
             const meta = bodyPartMeta(assigned.body_part);
             return (
-              <div className="card" key={assigned.id}>
+              <motion.div className="card" key={assigned.id} {...cardTransition(idx)}>
                 {editingId === assigned.id ? (
                   <form onSubmit={(e) => submitEdit(e, assigned.id)}>
                     <div className="form-group">
@@ -357,7 +371,7 @@ function Trainer() {
                     </div>
                   </div>
                 )}
-              </div>
+              </motion.div>
             );
           })}
         </div>
@@ -370,7 +384,7 @@ function Trainer() {
           {clientDetail.recent_workouts.map((item, idx) => {
             const meta = bodyPartMeta(item.body_part);
             return (
-              <div className="card" key={idx}>
+              <motion.div className="card" key={idx} {...cardTransition(idx)}>
                 <div className="row-between">
                   <div className="card-title">{item.exercise}</div>
                   {meta && (
@@ -385,19 +399,26 @@ function Trainer() {
                     Set {s.set_number}: {s.weight}kg x {s.reps} reps
                   </div>
                 ))}
-              </div>
+              </motion.div>
             );
           })}
         </div>
 
         <div className="section">
-          <button className="btn btn-primary" onClick={() => setShowAssign(!showAssign)}>
+          <motion.button className="btn btn-primary" whileTap={tapScale} onClick={() => setShowAssign(!showAssign)}>
             ➕ Assign New Exercise
-          </button>
+          </motion.button>
         </div>
 
         {showAssign && (
-          <form onSubmit={submitAssign} className="section">
+          <motion.form
+            onSubmit={submitAssign}
+            className="section"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            style={{ overflow: "hidden" }}
+          >
             <div className="form-group">
               <label className="form-label">Body Part</label>
               <div className="chip-row">
@@ -425,16 +446,20 @@ function Trainer() {
               />
             </div>
             <button className="btn btn-success" type="submit">Assign</button>
-          </form>
+          </motion.form>
         )}
 
-        {assignedMessage && <div className="success-box">{assignedMessage}</div>}
-      </div>
+        {assignedMessage && (
+          <motion.div className="success-box" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {assignedMessage}
+          </motion.div>
+        )}
+      </motion.div>
     );
   }
 
   return (
-    <div>
+    <motion.div {...screenTransition}>
       <div className="hero-card">
         <div className="hero-greeting">👥 My Clients</div>
         <div className="hero-subtitle">
@@ -444,13 +469,17 @@ function Trainer() {
         </div>
       </div>
 
-      {error && <div className="auth-error">{error}</div>}
+      {error && (
+        <motion.div className="auth-error" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+          {error}
+        </motion.div>
+      )}
 
       {clients.length === 0 && <div className="empty-text">No clients yet.</div>}
 
       <div className="section">
-        {clients.map((client) => (
-          <div className="card clickable" key={client.id} onClick={() => openClient(client.id)}>
+        {clients.map((client, idx) => (
+          <motion.div className="card clickable" key={client.id} {...cardTransition(idx)} whileTap={tapScale} onClick={() => openClient(client.id)}>
             <div className="card-row">
               <div className="avatar">{initialsFor(client.name)}</div>
               <div className="card-text">
@@ -467,7 +496,7 @@ function Trainer() {
               </div>
               <span className="chevron">›</span>
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
 
@@ -475,7 +504,7 @@ function Trainer() {
         <div className="section">
           <div className="section-title">💬 Client Feedback</div>
           {notes.map((note, idx) => (
-            <div className="card" key={idx}>
+            <motion.div className="card" key={idx} {...cardTransition(idx)}>
               <div className="row-between">
                 <div className="card-title">{note.exerciser_name}</div>
                 <span className="card-subtitle">{formatDateLabel(note.created_at.slice(0, 10))}</span>
@@ -483,11 +512,11 @@ function Trainer() {
               <div className="card-subtitle">
                 {note.author === "exerciser" ? "Left you" : "You removed them"} — {note.note}
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 

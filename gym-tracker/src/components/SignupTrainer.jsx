@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { motion } from "motion/react";
 import { api } from "../api/client";
+import { screenTransition, tapScale } from "../utils/motion";
 
 const SPECIALTIES = [
   "Strength Training",
@@ -62,12 +64,16 @@ function SignupTrainer({ onSignup, onBack }) {
         <span>GymTrack</span>
       </div>
 
-      <div className="auth-card">
+      <motion.div className="auth-card" {...screenTransition}>
         <button className="back-button auth-back" onClick={onBack} type="button">←</button>
         <h1 className="auth-title">Create Account</h1>
         <p className="auth-subtitle">Sign up as a Trainer</p>
 
-        {error && <div className="auth-error">{error}</div>}
+        {error && (
+          <motion.div className="auth-error" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {error}
+          </motion.div>
+        )}
 
         <form onSubmit={submit}>
           <div className="form-group">
@@ -151,16 +157,16 @@ function SignupTrainer({ onSignup, onBack }) {
             />
           </div>
 
-          <button className="btn btn-primary" type="submit" disabled={submitting}>
+          <motion.button className="btn btn-primary" type="submit" whileTap={tapScale} disabled={submitting}>
             {submitting ? "Creating…" : "Create Account"}
-          </button>
+          </motion.button>
         </form>
 
         <p className="auth-footer">
           Already have an account?{" "}
           <button className="link-button" onClick={onBack}>Log in</button>
         </p>
-      </div>
+      </motion.div>
     </div>
   );
 }

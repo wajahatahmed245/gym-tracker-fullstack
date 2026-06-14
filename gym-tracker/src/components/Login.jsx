@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { motion } from "motion/react";
 import { api } from "../api/client";
+import { screenTransition, tapScale } from "../utils/motion";
 
 const ROLES = [
   { id: "exerciser", label: "Exerciser", icon: "🏋️" },
@@ -42,7 +44,7 @@ function Login({ onLogin, onNavigate }) {
         <span>GymTrack</span>
       </div>
 
-      <div className="auth-card">
+      <motion.div className="auth-card" {...screenTransition}>
         <h1 className="auth-title">Welcome back</h1>
         <p className="auth-subtitle">Log in to continue</p>
 
@@ -60,7 +62,11 @@ function Login({ onLogin, onNavigate }) {
           ))}
         </div>
 
-        {error && <div className="auth-error">{error}</div>}
+        {error && (
+          <motion.div className="auth-error" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {error}
+          </motion.div>
+        )}
 
         <form onSubmit={submit}>
           <div className="form-group">
@@ -85,9 +91,9 @@ function Login({ onLogin, onNavigate }) {
             />
           </div>
 
-          <button className="btn btn-primary" type="submit" disabled={submitting}>
+          <motion.button className="btn btn-primary" type="submit" whileTap={tapScale} disabled={submitting}>
             {submitting ? "Logging in…" : "Log In"}
-          </button>
+          </motion.button>
         </form>
 
         {role !== "admin" && (
@@ -101,7 +107,7 @@ function Login({ onLogin, onNavigate }) {
             </button>
           </p>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }

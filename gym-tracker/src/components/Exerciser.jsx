@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { BODY_PARTS, bodyPartMeta } from "../utils/bodyParts";
 import { formatDateLabel, formatJoinedDate, sinceLabel } from "../utils/format";
 import { telHref, whatsappHref } from "../utils/phone";
 import { ACTIVITY_LEVELS, BMI_CATEGORY_CLASS, GENDERS } from "../utils/health";
 import { api } from "../api/client";
+import { screenTransition, cardTransition, tabContent, tapScale } from "../utils/motion";
 
 const CARDIO_TYPES = [
   { id: "Running", icon: "🏃" },
@@ -416,10 +418,10 @@ function Exerciser({ user, onUserChange }) {
     setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + delta, 1));
   };
 
-  const renderWorkoutCard = (item, { showDate = false } = {}) => {
+  const renderWorkoutCard = (item, { showDate = false, index = 0 } = {}) => {
     const meta = bodyPartMeta(item.body_part);
     return (
-      <div className="card" key={item.id}>
+      <motion.div className="card" key={item.id} {...cardTransition(index)}>
         <div className="row-between">
           <div className="card-title">{item.exercise}</div>
           <span className={`tag ${meta.tagClass}`}>
@@ -489,18 +491,26 @@ function Exerciser({ user, onUserChange }) {
             </div>
           </>
         )}
-      </div>
+      </motion.div>
     );
   };
 
   if (loading) {
-    return <div className="loading-screen">Loading…</div>;
+    return (
+      <motion.div className="loading-screen" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        Loading…
+      </motion.div>
+    );
   }
 
   if (screen === "home") {
     return (
-      <div>
-        {error && <div className="auth-error">{error}</div>}
+      <motion.div {...screenTransition}>
+        {error && (
+          <motion.div className="auth-error" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {error}
+          </motion.div>
+        )}
         <div className="hero-card">
           <div className="hero-greeting">Welcome back, {user?.name} 👋</div>
           {currentTrainer && (
@@ -543,24 +553,24 @@ function Exerciser({ user, onUserChange }) {
         <div className="section">
           <div className="section-title">Quick Actions</div>
           <div className="quick-actions">
-            <button className="btn btn-primary" onClick={() => setScreen("my-exercises")}>
+            <motion.button className="btn btn-primary" whileTap={tapScale} onClick={() => setScreen("my-exercises")}>
               💪 My Exercises
-            </button>
-            <button className="btn btn-outline" onClick={() => setScreen("log-cardio")}>
+            </motion.button>
+            <motion.button className="btn btn-outline" whileTap={tapScale} onClick={() => setScreen("log-cardio")}>
               🏃 Log Cardio
-            </button>
-            <button className="btn" onClick={() => setScreen("history")}>
+            </motion.button>
+            <motion.button className="btn" whileTap={tapScale} onClick={() => setScreen("history")}>
               📜 View History
-            </button>
-            <button className="btn" onClick={() => setScreen("trainer")}>
+            </motion.button>
+            <motion.button className="btn" whileTap={tapScale} onClick={() => setScreen("trainer")}>
               🧑‍🏫 My Trainer
-            </button>
-            <button className="btn" onClick={openHealth}>
+            </motion.button>
+            <motion.button className="btn" whileTap={tapScale} onClick={openHealth}>
               ⚖️ My Health
-            </button>
+            </motion.button>
           </div>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
@@ -572,14 +582,22 @@ function Exerciser({ user, onUserChange }) {
     }, {});
 
     return (
-      <div>
+      <motion.div {...screenTransition}>
         <div className="screen-header">
           <button className="back-button" onClick={goHome}>←</button>
           <span className="screen-title">My Exercises</span>
         </div>
 
-        {error && <div className="auth-error">{error}</div>}
-        {savedMessage && <div className="success-box">{savedMessage}</div>}
+        {error && (
+          <motion.div className="auth-error" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {error}
+          </motion.div>
+        )}
+        {savedMessage && (
+          <motion.div className="success-box" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {savedMessage}
+          </motion.div>
+        )}
 
         {assignedWorkouts.length === 0 && (
           <div className="info-box">Your trainer hasn't assigned any exercises yet.</div>
@@ -588,10 +606,10 @@ function Exerciser({ user, onUserChange }) {
         {BODY_PARTS.filter((part) => grouped[part.id]).map((part) => (
           <div className="section" key={part.id}>
             <div className="section-title">{part.icon} {part.label}</div>
-            {grouped[part.id].map((assigned) => {
+            {grouped[part.id].map((assigned, idx) => {
               const last = lastSessions[assigned.id];
               return (
-                <div className="card" key={assigned.id}>
+                <motion.div className="card" key={assigned.id} {...cardTransition(idx)}>
                   <div className="row-between">
                     <div className="card-title">{assigned.exercise}</div>
                     <button className="btn btn-outline" type="button" onClick={() => toggleExpand(assigned)}>
@@ -600,7 +618,13 @@ function Exerciser({ user, onUserChange }) {
                   </div>
 
                   {expandedId === assigned.id && (
-                    <form onSubmit={(e) => submitLog(e, assigned)}>
+                    <motion.form
+                      onSubmit={(e) => submitLog(e, assigned)}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
+                      style={{ overflow: "hidden" }}
+                    >
                       {last && (
                         <div className="card-subtitle">
                           Last ({formatDateLabel(last.date)}): {last.sets
@@ -653,26 +677,30 @@ function Exerciser({ user, onUserChange }) {
                       </button>
 
                       <button className="btn btn-primary" type="submit">Save</button>
-                    </form>
+                    </motion.form>
                   )}
-                </div>
+                </motion.div>
               );
             })}
           </div>
         ))}
-      </div>
+      </motion.div>
     );
   }
 
   if (screen === "history") {
     return (
-      <div>
+      <motion.div {...screenTransition}>
         <div className="screen-header">
           <button className="back-button" onClick={goHome}>←</button>
           <span className="screen-title">Workout History</span>
         </div>
 
-        {error && <div className="auth-error">{error}</div>}
+        {error && (
+          <motion.div className="auth-error" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {error}
+          </motion.div>
+        )}
 
         <div className="filter-tabs">
           <button
@@ -695,22 +723,23 @@ function Exerciser({ user, onUserChange }) {
           </button>
         </div>
 
+        <AnimatePresence mode="wait">
         {historyView === "list" && (
-          <>
+          <motion.div key="list" {...tabContent}>
             {Object.keys(groupedHistory).length === 0 && (
               <div className="card-subtitle">No workouts logged yet.</div>
             )}
             {Object.entries(groupedHistory).map(([date, items]) => (
               <div className="date-group" key={date}>
                 <div className="date-heading">{formatDateLabel(date)}</div>
-                {items.map((item) => renderWorkoutCard(item))}
+                {items.map((item, idx) => renderWorkoutCard(item, { index: idx }))}
               </div>
             ))}
-          </>
+          </motion.div>
         )}
 
         {historyView === "calendar" && (
-          <div>
+          <motion.div key="calendar" {...tabContent}>
             <div className="calendar-header">
               <button className="calendar-nav-btn" type="button" onClick={() => goToMonth(-1)}>‹</button>
               <span className="calendar-header-title">
@@ -730,31 +759,34 @@ function Exerciser({ user, onUserChange }) {
                 if (dateStr === selectedDate) classes.push("selected");
                 if (dateStr === toLocalDateStr(new Date())) classes.push("today");
                 return (
-                  <button
+                  <motion.button
                     key={dateStr}
                     type="button"
+                    whileTap={{ scale: 0.85 }}
                     className={classes.join(" ")}
                     onClick={() => setSelectedDate(dateStr)}
                   >
                     {dayNum}
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>
 
-            <div className="section">
-              <div className="date-heading">{formatDateLabel(selectedDate)}</div>
-              {(groupedHistory[selectedDate] || []).length === 0 ? (
-                <div className="card-subtitle">No workouts logged on this date.</div>
-              ) : (
-                groupedHistory[selectedDate].map((item) => renderWorkoutCard(item))
-              )}
-            </div>
-          </div>
+            <AnimatePresence mode="wait">
+              <motion.div className="section" key={selectedDate} {...tabContent}>
+                <div className="date-heading">{formatDateLabel(selectedDate)}</div>
+                {(groupedHistory[selectedDate] || []).length === 0 ? (
+                  <div className="card-subtitle">No workouts logged on this date.</div>
+                ) : (
+                  groupedHistory[selectedDate].map((item, idx) => renderWorkoutCard(item, { index: idx }))
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </motion.div>
         )}
 
         {historyView === "exercise" && (
-          <div>
+          <motion.div key="exercise" {...tabContent}>
             {Object.keys(exerciseOptionsByBodyPart).length === 0 ? (
               <div className="card-subtitle">No workouts logged yet.</div>
             ) : (
@@ -801,27 +833,32 @@ function Exerciser({ user, onUserChange }) {
                     {exerciseHistory.length === 0 ? (
                       <div className="card-subtitle">No history logged for this exercise yet.</div>
                     ) : (
-                      exerciseHistory.map((item) => renderWorkoutCard(item, { showDate: true }))
+                      exerciseHistory.map((item, idx) => renderWorkoutCard(item, { showDate: true, index: idx }))
                     )}
                   </div>
                 )}
               </>
             )}
-          </div>
+          </motion.div>
         )}
-      </div>
+        </AnimatePresence>
+      </motion.div>
     );
   }
 
   if (screen === "log-cardio") {
     return (
-      <div>
+      <motion.div {...screenTransition}>
         <div className="screen-header">
           <button className="back-button" onClick={goHome}>←</button>
           <span className="screen-title">Log Cardio</span>
         </div>
 
-        {error && <div className="auth-error">{error}</div>}
+        {error && (
+          <motion.div className="auth-error" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {error}
+          </motion.div>
+        )}
 
         <form onSubmit={submitCardio}>
           <div className="form-group">
@@ -857,27 +894,29 @@ function Exerciser({ user, onUserChange }) {
         </form>
 
         {savedMessage && screen === "log-cardio" && (
-          <div className="success-box">{savedMessage}</div>
+          <motion.div className="success-box" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {savedMessage}
+          </motion.div>
         )}
 
         {cardioLogs.length > 0 && (
           <div className="section">
             <div className="section-title">Cardio History</div>
-            {cardioLogs.map((log) => {
+            {cardioLogs.map((log, idx) => {
               const icon = CARDIO_TYPES.find((t) => t.id === log.activity)?.icon;
               return (
-                <div className="card" key={log.id}>
+                <motion.div className="card" key={log.id} {...cardTransition(idx)}>
                   <div className="row-between">
                     <div className="card-title">{log.activity}</div>
                     <span className="tag tag-cardio">{icon} Cardio</span>
                   </div>
                   <div className="card-subtitle">{formatDateLabel(log.date)} — {log.duration_minutes} minutes</div>
-                </div>
+                </motion.div>
               );
             })}
           </div>
         )}
-      </div>
+      </motion.div>
     );
   }
 
@@ -885,13 +924,17 @@ function Exerciser({ user, onUserChange }) {
     const otherTrainers = trainers.filter((t) => t.id !== trainerId);
 
     return (
-      <div>
+      <motion.div {...screenTransition}>
         <div className="screen-header">
           <button className="back-button" onClick={goHome}>←</button>
           <span className="screen-title">My Trainer</span>
         </div>
 
-        {trainerError && <div className="auth-error">{trainerError}</div>}
+        {trainerError && (
+          <motion.div className="auth-error" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {trainerError}
+          </motion.div>
+        )}
 
         {currentTrainer ? (
           <div className="card">
@@ -957,8 +1000,8 @@ function Exerciser({ user, onUserChange }) {
           {otherTrainers.length === 0 && (
             <div className="card-subtitle">No trainers available right now.</div>
           )}
-          {otherTrainers.map((t) => (
-            <div className="card" key={t.id}>
+          {otherTrainers.map((t, idx) => (
+            <motion.div className="card" key={t.id} {...cardTransition(idx)}>
               <div className="row-between">
                 <div>
                   <div className="card-title">{t.name}</div>
@@ -966,10 +1009,10 @@ function Exerciser({ user, onUserChange }) {
                 </div>
                 <button className="btn btn-outline" onClick={() => handleSelectTrainer(t.id)}>Select</button>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
-      </div>
+      </motion.div>
     );
   }
 
@@ -977,13 +1020,17 @@ function Exerciser({ user, onUserChange }) {
     const health = user?.exerciser_profile?.health;
 
     return (
-      <div>
+      <motion.div {...screenTransition}>
         <div className="screen-header">
           <button className="back-button" onClick={goHome}>←</button>
           <span className="screen-title">My Health</span>
         </div>
 
-        {savedMessage && <div className="success-box">{savedMessage}</div>}
+        {savedMessage && (
+          <motion.div className="success-box" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {savedMessage}
+          </motion.div>
+        )}
 
         {health ? (
           <div className="section">
@@ -1000,7 +1047,11 @@ function Exerciser({ user, onUserChange }) {
         <div className="section">
           <div className="section-title">Edit Profile</div>
 
-          {profileError && <div className="auth-error">{profileError}</div>}
+          {profileError && (
+            <motion.div className="auth-error" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+              {profileError}
+            </motion.div>
+          )}
 
           {profileForm && (
             <form onSubmit={submitProfile}>
@@ -1076,7 +1127,7 @@ function Exerciser({ user, onUserChange }) {
             </form>
           )}
         </div>
-      </div>
+      </motion.div>
     );
   }
 
