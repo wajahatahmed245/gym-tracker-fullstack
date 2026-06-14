@@ -591,6 +591,91 @@ body {
   color: var(--color-danger);
 }
 
+/* ---------- Health snapshot card ---------- */
+.health-card {
+  background: linear-gradient(160deg, #ffffff 0%, var(--color-surface-alt) 100%);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.health-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.health-bmi-value {
+  font-size: 38px;
+  font-weight: 800;
+  color: var(--color-primary);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.health-bmi-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 4px;
+}
+
+.health-range-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fdecec 0%, #e3f6e8 25%, #e3f6e8 75%, #fdecec 100%);
+  margin: 18px 0 8px;
+}
+
+.health-range-marker {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 3px solid #ffffff;
+  box-shadow: var(--shadow-sm);
+  transform: translate(-50%, -50%);
+}
+
+.health-range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.health-range-labels span:nth-child(2) {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.health-setup-card {
+  background: linear-gradient(135deg, var(--color-primary-light) 0%, #ffffff 100%);
+  border: 1px solid #cfe3fb;
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  text-align: center;
+}
+
+.health-setup-card .card-title {
+  margin-bottom: 4px;
+}
+
+.health-setup-card p {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 6px 0 14px;
+  line-height: 1.5;
+}
+
 /* ---------- Filter tabs ---------- */
 .filter-tabs {
   display: flex;

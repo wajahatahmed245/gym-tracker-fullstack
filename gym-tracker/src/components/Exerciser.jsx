@@ -14,6 +14,60 @@ const CARDIO_TYPES = [
   { id: "Elliptical", icon: "🏃‍♀️" },
 ];
 
+function HealthCard({ health, currentWeight }) {
+  const { healthy_weight_min_kg: min, healthy_weight_max_kg: max } = health;
+
+  let percent = 50;
+  if (currentWeight < min) {
+    percent = Math.max(2, (currentWeight / min) * 25);
+  } else if (currentWeight > max) {
+    percent = Math.min(98, 75 + ((currentWeight - max) / max) * 25);
+  } else if (max > min) {
+    percent = 25 + ((currentWeight - min) / (max - min)) * 50;
+  }
+
+  return (
+    <div className="health-card">
+      <div className="health-card-top">
+        <div>
+          <div className="health-bmi-value">{health.bmi}</div>
+          <div className="health-bmi-label">BMI</div>
+        </div>
+        <span className={`badge ${BMI_CATEGORY_CLASS[health.bmi_category] || ""}`}>
+          {health.bmi_category}
+        </span>
+      </div>
+
+      <div className="metric-grid">
+        <div className="metric-card">
+          <div className="metric-value">{health.bmr}</div>
+          <div className="metric-label">BMR (kcal/day)</div>
+        </div>
+        <div className="metric-card">
+          <div className="metric-value">{health.tdee}</div>
+          <div className="metric-label">TDEE (kcal/day)</div>
+        </div>
+      </div>
+
+      <div className="health-range-bar">
+        <div className="health-range-marker" style={{ left: `${percent}%` }} />
+      </div>
+      <div className="health-range-labels">
+        <span>{min}kg</span>
+        <span>Healthy Range</span>
+        <span>{max}kg</span>
+      </div>
+
+      {health.target_weight_kg != null && (
+        <div className="info-box">
+          <div className="info-box-title">🎯 Target Weight</div>
+          Aim for {health.target_weight_kg}kg to reach a healthy BMI range.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Exerciser({ user, onUserChange }) {
   const [screen, setScreen] = useState("home");
   const [loading, setLoading] = useState(true);
@@ -336,6 +390,27 @@ function Exerciser({ user, onUserChange }) {
               <div className="hero-stat-label">Since Last Workout</div>
             </div>
           </div>
+        </div>
+
+        <div className="section">
+          <div className="section-title">⚖️ Health Snapshot</div>
+          {user?.exerciser_profile?.health ? (
+            <HealthCard
+              health={user.exerciser_profile.health}
+              currentWeight={user.exerciser_profile.weight_kg}
+            />
+          ) : (
+            <div className="health-setup-card">
+              <div className="card-title">Complete your health profile</div>
+              <p>
+                Add your height, weight, age, gender, and activity level to see your BMI, BMR, TDEE,
+                and a personalized healthy weight range.
+              </p>
+              <button className="btn btn-primary" type="button" onClick={openHealth}>
+                Set Up Now
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="section">
@@ -735,33 +810,7 @@ function Exerciser({ user, onUserChange }) {
         {health ? (
           <div className="section">
             <div className="section-title">Health Metrics</div>
-            <div className="card">
-              <div className="row-between">
-                <div className="card-title">BMI: {health.bmi}</div>
-                <span className={`badge ${BMI_CATEGORY_CLASS[health.bmi_category] || ""}`}>
-                  {health.bmi_category}
-                </span>
-              </div>
-              <div className="metric-grid">
-                <div className="metric-card">
-                  <div className="metric-value">{health.bmr}</div>
-                  <div className="metric-label">BMR (kcal/day)</div>
-                </div>
-                <div className="metric-card">
-                  <div className="metric-value">{health.tdee}</div>
-                  <div className="metric-label">TDEE (kcal/day)</div>
-                </div>
-              </div>
-              <div className="card-subtitle">
-                Healthy weight range: {health.healthy_weight_min_kg}kg – {health.healthy_weight_max_kg}kg
-              </div>
-              {health.target_weight_kg != null && (
-                <div className="info-box">
-                  <div className="info-box-title">🎯 Target Weight</div>
-                  Your current weight is outside the healthy range. Aim for {health.target_weight_kg}kg.
-                </div>
-              )}
-            </div>
+            <HealthCard health={health} currentWeight={user.exerciser_profile.weight_kg} />
           </div>
         ) : (
           <div className="info-box">
