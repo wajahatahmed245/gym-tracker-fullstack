@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BODY_PARTS, bodyPartMeta } from "../utils/bodyParts";
 import { formatDateLabel, formatJoinedDate, sinceLabel } from "../utils/format";
 import { telHref, whatsappHref } from "../utils/phone";
+import { ACTIVITY_LEVELS, BMI_CATEGORY_CLASS, GENDERS } from "../utils/health";
 import { api } from "../api/client";
 
 const CARDIO_TYPES = [
@@ -40,6 +41,10 @@ function Exerciser({ user, onUserChange }) {
     activity: CARDIO_TYPES[0].id,
     duration: "",
   });
+
+  const [profileForm, setProfileForm] = useState(null);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState("");
 
   const trainerId = user?.exerciser_profile?.trainer_id || null;
   const currentTrainer = trainers.find((t) => t.id === trainerId);
@@ -95,6 +100,7 @@ function Exerciser({ user, onUserChange }) {
   const goHome = () => {
     setSavedMessage("");
     setError("");
+    setProfileError("");
     setShowLeaveForm(false);
     setLeaveNote("");
     setEditingWorkoutId(null);
@@ -247,6 +253,49 @@ function Exerciser({ user, onUserChange }) {
     }
   };
 
+  const openHealth = () => {
+    const profile = user?.exerciser_profile || {};
+    setProfileForm({
+      height: profile.height_cm != null ? String(profile.height_cm) : "",
+      weight: profile.weight_kg != null ? String(profile.weight_kg) : "",
+      age: profile.age != null ? String(profile.age) : "",
+      gender: profile.gender || GENDERS[0],
+      activityLevel: profile.activity_level || ACTIVITY_LEVELS[0].id,
+    });
+    setProfileError("");
+    setSavedMessage("");
+    setScreen("health");
+  };
+
+  const handleProfileChange = (field, value) => {
+    setProfileForm({ ...profileForm, [field]: value });
+  };
+
+  const submitProfile = async (e) => {
+    e.preventDefault();
+    if (!profileForm.height || !profileForm.weight || !profileForm.age) {
+      setProfileError("Please fill in all fields.");
+      return;
+    }
+    setProfileError("");
+    setProfileSaving(true);
+    try {
+      await api.updateProfile({
+        height_cm: Number(profileForm.height),
+        weight_kg: Number(profileForm.weight),
+        age: Number(profileForm.age),
+        gender: profileForm.gender,
+        activity_level: profileForm.activityLevel,
+      });
+      await onUserChange?.();
+      setSavedMessage("Profile updated successfully!");
+    } catch (err) {
+      setProfileError(err.message || "Failed to update profile.");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
   const handleSelectTrainer = async (id) => {
     setTrainerError("");
     try {
@@ -303,6 +352,9 @@ function Exerciser({ user, onUserChange }) {
             </button>
             <button className="btn" onClick={() => setScreen("trainer")}>
               🧑‍🏫 My Trainer
+            </button>
+            <button className="btn" onClick={openHealth}>
+              ⚖️ My Health
             </button>
           </div>
         </div>
@@ -663,6 +715,139 @@ function Exerciser({ user, onUserChange }) {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === "health") {
+    const health = user?.exerciser_profile?.health;
+
+    return (
+      <div>
+        <div className="screen-header">
+          <button className="back-button" onClick={goHome}>←</button>
+          <span className="screen-title">My Health</span>
+        </div>
+
+        {savedMessage && <div className="success-box">{savedMessage}</div>}
+
+        {health ? (
+          <div className="section">
+            <div className="section-title">Health Metrics</div>
+            <div className="card">
+              <div className="row-between">
+                <div className="card-title">BMI: {health.bmi}</div>
+                <span className={`badge ${BMI_CATEGORY_CLASS[health.bmi_category] || ""}`}>
+                  {health.bmi_category}
+                </span>
+              </div>
+              <div className="metric-grid">
+                <div className="metric-card">
+                  <div className="metric-value">{health.bmr}</div>
+                  <div className="metric-label">BMR (kcal/day)</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-value">{health.tdee}</div>
+                  <div className="metric-label">TDEE (kcal/day)</div>
+                </div>
+              </div>
+              <div className="card-subtitle">
+                Healthy weight range: {health.healthy_weight_min_kg}kg – {health.healthy_weight_max_kg}kg
+              </div>
+              {health.target_weight_kg != null && (
+                <div className="info-box">
+                  <div className="info-box-title">🎯 Target Weight</div>
+                  Your current weight is outside the healthy range. Aim for {health.target_weight_kg}kg.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="info-box">
+            Fill in your height, weight, age, gender, and activity level below to see your BMI, BMR, TDEE,
+            and healthy weight range.
+          </div>
+        )}
+
+        <div className="section">
+          <div className="section-title">Edit Profile</div>
+
+          {profileError && <div className="auth-error">{profileError}</div>}
+
+          {profileForm && (
+            <form onSubmit={submitProfile}>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Height (cm)</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="1"
+                    step="0.1"
+                    placeholder="e.g. 175"
+                    value={profileForm.height}
+                    onChange={(e) => handleProfileChange("height", e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Weight (kg)</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="1"
+                    step="0.1"
+                    placeholder="e.g. 70"
+                    value={profileForm.weight}
+                    onChange={(e) => handleProfileChange("weight", e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Age</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="1"
+                    placeholder="e.g. 28"
+                    value={profileForm.age}
+                    onChange={(e) => handleProfileChange("age", e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Gender</label>
+                  <select
+                    className="form-select"
+                    value={profileForm.gender}
+                    onChange={(e) => handleProfileChange("gender", e.target.value)}
+                  >
+                    {GENDERS.map((gender) => (
+                      <option key={gender} value={gender}>{gender}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Activity Level</label>
+                <select
+                  className="form-select"
+                  value={profileForm.activityLevel}
+                  onChange={(e) => handleProfileChange("activityLevel", e.target.value)}
+                >
+                  {ACTIVITY_LEVELS.map((level) => (
+                    <option key={level.id} value={level.id}>{level.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <button className="btn btn-primary" type="submit" disabled={profileSaving}>
+                {profileSaving ? "Saving…" : "Save Profile"}
+              </button>
+            </form>
+          )}
         </div>
       </div>
     );

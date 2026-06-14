@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import crud
+from .. import health as health_calc
 from ..database import get_db
 from ..deps import require_approved_trainer
 from ..logging_config import logger
@@ -105,13 +106,19 @@ def client_detail(
 
     dates = crud.get_workout_dates(db, client.id)
 
+    profile = client.exerciser_profile
+    metrics = health_calc.build_health_metrics(
+        profile.height_cm, profile.weight_kg, profile.age, profile.gender, profile.activity_level
+    )
+
     return ClientDetailOut(
         id=client.id,
         name=client.name,
-        goal=client.exerciser_profile.goal,
+        goal=profile.goal,
         total_workouts=len(dates),
         streak=crud.compute_streak(dates),
-        joined_at=client.exerciser_profile.trainer_joined_at,
+        joined_at=profile.trainer_joined_at,
+        health=metrics,
         assigned_workouts=assigned,
         recent_workouts=recent,
     )

@@ -47,7 +47,15 @@ def signup_exerciser(payload: ExerciserSignup, db: Session = Depends(get_db)):
     db.add(user)
     db.flush()
 
-    profile = ExerciserProfile(user_id=user.id, goal=payload.goal)
+    profile = ExerciserProfile(
+        user_id=user.id,
+        goal=payload.goal,
+        height_cm=payload.height_cm,
+        weight_kg=payload.weight_kg,
+        age=payload.age,
+        gender=payload.gender,
+        activity_level=payload.activity_level,
+    )
     db.add(profile)
     db.commit()
     db.refresh(user)

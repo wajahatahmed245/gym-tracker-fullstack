@@ -30,6 +30,7 @@ from ..schemas import (
     CardioOut,
     DashboardOut,
     ExerciserProfileOut,
+    ExerciserProfileUpdate,
     LeaveNoteIn,
     TrainerListItem,
     TrainerSelect,
@@ -79,6 +80,24 @@ def dashboard(user: User = Depends(require_exerciser), db: Session = Depends(get
         workouts_this_week=crud.workouts_this_week(db, exerciser_id=user.id),
         days_since_last_workout=crud.days_since_last_workout(db, exerciser_id=user.id),
     )
+
+
+@router.patch("/exerciser/profile", response_model=ExerciserProfileOut)
+def update_profile(
+    payload: ExerciserProfileUpdate,
+    user: User = Depends(require_exerciser),
+    db: Session = Depends(get_db),
+):
+    profile = user.exerciser_profile
+    data = payload.model_dump(exclude_unset=True)
+    for field, value in data.items():
+        setattr(profile, field, value)
+
+    db.commit()
+    db.refresh(profile)
+
+    logger.info("Exerciser id=%s updated health profile", user.id)
+    return profile
 
 
 @router.get("/exerciser/workouts", response_model=List[WorkoutOut])

@@ -74,6 +74,20 @@ class NoteAuthor(str, enum.Enum):
     exerciser = "exerciser"
 
 
+class Gender(str, enum.Enum):
+    male = "Male"
+    female = "Female"
+    other = "Other"
+
+
+class ActivityLevel(str, enum.Enum):
+    sedentary = "Sedentary"
+    lightly_active = "Lightly Active"
+    moderately_active = "Moderately Active"
+    very_active = "Very Active"
+    extra_active = "Extra Active"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -110,6 +124,11 @@ class ExerciserProfile(Base):
     goal: Mapped[Goal] = mapped_column(Enum(Goal), nullable=False, default=Goal.general_fitness)
     trainer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     trainer_joined_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    height_cm: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    weight_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    age: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    gender: Mapped[Optional[Gender]] = mapped_column(Enum(Gender), nullable=True)
+    activity_level: Mapped[Optional[ActivityLevel]] = mapped_column(Enum(ActivityLevel), nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="exerciser_profile", foreign_keys=[user_id])
     trainer: Mapped[Optional["User"]] = relationship("User", foreign_keys=[trainer_id])

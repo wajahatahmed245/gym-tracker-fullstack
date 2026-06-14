@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api/client";
+import { ACTIVITY_LEVELS, GENDERS } from "../utils/health";
 
 const GOALS = ["Weight Loss", "Muscle Gain", "General Fitness", "Endurance"];
 
@@ -10,6 +11,11 @@ function SignupExerciser({ onSignup, onBack }) {
     password: "",
     confirmPassword: "",
     goal: GOALS[0],
+    height: "",
+    weight: "",
+    age: "",
+    gender: GENDERS[0],
+    activityLevel: ACTIVITY_LEVELS[0].id,
   });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -20,7 +26,15 @@ function SignupExerciser({ onSignup, onBack }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.password || !form.confirmPassword) {
+    if (
+      !form.name ||
+      !form.email ||
+      !form.password ||
+      !form.confirmPassword ||
+      !form.height ||
+      !form.weight ||
+      !form.age
+    ) {
       setError("Please fill in all required fields.");
       return;
     }
@@ -36,6 +50,11 @@ function SignupExerciser({ onSignup, onBack }) {
         email: form.email,
         password: form.password,
         goal: form.goal,
+        height_cm: Number(form.height),
+        weight_kg: Number(form.weight),
+        age: Number(form.age),
+        gender: form.gender,
+        activity_level: form.activityLevel,
       });
       onSignup(data);
     } catch (err) {
@@ -114,6 +133,72 @@ function SignupExerciser({ onSignup, onBack }) {
             >
               {GOALS.map((goal) => (
                 <option key={goal} value={goal}>{goal}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Height (cm)</label>
+              <input
+                className="form-input"
+                type="number"
+                min="1"
+                step="0.1"
+                placeholder="e.g. 175"
+                value={form.height}
+                onChange={(e) => handleChange("height", e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Weight (kg)</label>
+              <input
+                className="form-input"
+                type="number"
+                min="1"
+                step="0.1"
+                placeholder="e.g. 70"
+                value={form.weight}
+                onChange={(e) => handleChange("weight", e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Age</label>
+              <input
+                className="form-input"
+                type="number"
+                min="1"
+                placeholder="e.g. 28"
+                value={form.age}
+                onChange={(e) => handleChange("age", e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Gender</label>
+              <select
+                className="form-select"
+                value={form.gender}
+                onChange={(e) => handleChange("gender", e.target.value)}
+              >
+                {GENDERS.map((gender) => (
+                  <option key={gender} value={gender}>{gender}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Activity Level</label>
+            <select
+              className="form-select"
+              value={form.activityLevel}
+              onChange={(e) => handleChange("activityLevel", e.target.value)}
+            >
+              {ACTIVITY_LEVELS.map((level) => (
+                <option key={level.id} value={level.id}>{level.label}</option>
               ))}
             </select>
           </div>

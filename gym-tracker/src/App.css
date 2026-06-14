@@ -586,6 +586,11 @@ body {
   color: var(--color-warning);
 }
 
+.badge-danger {
+  background: #fdecec;
+  color: var(--color-danger);
+}
+
 /* ---------- Filter tabs ---------- */
 .filter-tabs {
   display: flex;

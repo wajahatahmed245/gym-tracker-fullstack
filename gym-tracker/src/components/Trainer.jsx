@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { BODY_PARTS, bodyPartMeta } from "../utils/bodyParts";
 import { formatDateLabel, formatJoinedDate, initialsFor } from "../utils/format";
+import { BMI_CATEGORY_CLASS } from "../utils/health";
 import { api } from "../api/client";
 
 function Trainer() {
@@ -265,6 +266,43 @@ function Trainer() {
             <div className="metric-label">Day Streak</div>
           </div>
         </div>
+
+        {clientDetail.health ? (
+          <div className="section">
+            <div className="section-title">⚖️ Health Metrics</div>
+            <div className="card">
+              <div className="row-between">
+                <div className="card-title">BMI: {clientDetail.health.bmi}</div>
+                <span className={`badge ${BMI_CATEGORY_CLASS[clientDetail.health.bmi_category] || ""}`}>
+                  {clientDetail.health.bmi_category}
+                </span>
+              </div>
+              <div className="metric-grid">
+                <div className="metric-card">
+                  <div className="metric-value">{clientDetail.health.bmr}</div>
+                  <div className="metric-label">BMR (kcal/day)</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-value">{clientDetail.health.tdee}</div>
+                  <div className="metric-label">TDEE (kcal/day)</div>
+                </div>
+              </div>
+              <div className="card-subtitle">
+                Healthy weight range: {clientDetail.health.healthy_weight_min_kg}kg – {clientDetail.health.healthy_weight_max_kg}kg
+              </div>
+              {clientDetail.health.target_weight_kg != null && (
+                <div className="info-box">
+                  <div className="info-box-title">🎯 Target Weight</div>
+                  This client's current weight is outside the healthy range. Target: {clientDetail.health.target_weight_kg}kg.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="info-box">
+            This client hasn't completed their health profile yet (height, weight, age, gender, activity level).
+          </div>
+        )}
 
         <div className="section">
           <div className="section-title">🏋️ Assigned Exercises</div>
