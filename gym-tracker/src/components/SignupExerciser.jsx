@@ -14,8 +14,8 @@ function SignupExerciser({ onSignup, onBack }) {
     height: "",
     weight: "",
     age: "",
-    gender: GENDERS[0],
-    activityLevel: ACTIVITY_LEVELS[0].id,
+    gender: "",
+    activityLevel: "",
   });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -26,15 +26,7 @@ function SignupExerciser({ onSignup, onBack }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (
-      !form.name ||
-      !form.email ||
-      !form.password ||
-      !form.confirmPassword ||
-      !form.height ||
-      !form.weight ||
-      !form.age
-    ) {
+    if (!form.name || !form.email || !form.password || !form.confirmPassword) {
       setError("Please fill in all required fields.");
       return;
     }
@@ -50,11 +42,11 @@ function SignupExerciser({ onSignup, onBack }) {
         email: form.email,
         password: form.password,
         goal: form.goal,
-        height_cm: Number(form.height),
-        weight_kg: Number(form.weight),
-        age: Number(form.age),
-        gender: form.gender,
-        activity_level: form.activityLevel,
+        height_cm: form.height === "" ? null : Number(form.height),
+        weight_kg: form.weight === "" ? null : Number(form.weight),
+        age: form.age === "" ? null : Number(form.age),
+        gender: form.gender || null,
+        activity_level: form.activityLevel || null,
       });
       onSignup(data);
     } catch (err) {
@@ -137,9 +129,15 @@ function SignupExerciser({ onSignup, onBack }) {
             </select>
           </div>
 
+          <div className="info-box">
+            <div className="info-box-title">💡 Optional — get personalized health insights</div>
+            Add these details now to see your BMI, BMR, and daily calorie needs right away, or skip
+            them and fill them in later from your profile.
+          </div>
+
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Height (cm)</label>
+              <label className="form-label">Height (cm) <span className="optional-label">Optional</span></label>
               <input
                 className="form-input"
                 type="number"
@@ -151,7 +149,7 @@ function SignupExerciser({ onSignup, onBack }) {
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Weight (kg)</label>
+              <label className="form-label">Weight (kg) <span className="optional-label">Optional</span></label>
               <input
                 className="form-input"
                 type="number"
@@ -166,7 +164,7 @@ function SignupExerciser({ onSignup, onBack }) {
 
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Age</label>
+              <label className="form-label">Age <span className="optional-label">Optional</span></label>
               <input
                 className="form-input"
                 type="number"
@@ -177,12 +175,13 @@ function SignupExerciser({ onSignup, onBack }) {
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Gender</label>
+              <label className="form-label">Gender <span className="optional-label">Optional</span></label>
               <select
                 className="form-select"
                 value={form.gender}
                 onChange={(e) => handleChange("gender", e.target.value)}
               >
+                <option value="">Prefer to skip</option>
                 {GENDERS.map((gender) => (
                   <option key={gender} value={gender}>{gender}</option>
                 ))}
@@ -191,12 +190,13 @@ function SignupExerciser({ onSignup, onBack }) {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Activity Level</label>
+            <label className="form-label">Activity Level <span className="optional-label">Optional</span></label>
             <select
               className="form-select"
               value={form.activityLevel}
               onChange={(e) => handleChange("activityLevel", e.target.value)}
             >
+              <option value="">Prefer to skip</option>
               {ACTIVITY_LEVELS.map((level) => (
                 <option key={level.id} value={level.id}>{level.label}</option>
               ))}

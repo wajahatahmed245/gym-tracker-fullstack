@@ -28,11 +28,11 @@ class ExerciserSignup(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6)
     goal: Goal = Goal.general_fitness
-    height_cm: float = Field(gt=0, le=300)
-    weight_kg: float = Field(gt=0, le=500)
-    age: int = Field(ge=10, le=120)
-    gender: Gender
-    activity_level: ActivityLevel
+    height_cm: Optional[float] = Field(default=None, gt=0, le=300)
+    weight_kg: Optional[float] = Field(default=None, gt=0, le=500)
+    age: Optional[int] = Field(default=None, ge=10, le=120)
+    gender: Optional[Gender] = None
+    activity_level: Optional[ActivityLevel] = None
 
 
 class TrainerSignup(BaseModel):
