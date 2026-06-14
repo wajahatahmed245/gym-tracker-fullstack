@@ -14,6 +14,29 @@ const CARDIO_TYPES = [
   { id: "Elliptical", icon: "🏃‍♀️" },
 ];
 
+const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
+
+function toLocalDateStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function buildCalendarCells(monthDate) {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startWeekday = new Date(year, month, 1).getDay();
+
+  const cells = [];
+  for (let i = 0; i < startWeekday; i++) cells.push(null);
+  for (let day = 1; day <= daysInMonth; day++) {
+    cells.push(`${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
+  }
+  return cells;
+}
+
 function HealthCard({ health, currentWeight }) {
   const { healthy_weight_min_kg: min, healthy_weight_max_kg: max } = health;
 
@@ -99,6 +122,15 @@ function Exerciser({ user, onUserChange }) {
   const [profileForm, setProfileForm] = useState(null);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState("");
+
+  const [historyView, setHistoryView] = useState("list");
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [selectedDate, setSelectedDate] = useState(() => toLocalDateStr(new Date()));
+  const [exerciseFilterBodyPart, setExerciseFilterBodyPart] = useState(null);
+  const [exerciseFilterId, setExerciseFilterId] = useState(null);
 
   const trainerId = user?.exerciser_profile?.trainer_id || null;
   const currentTrainer = trainers.find((t) => t.id === trainerId);
@@ -366,6 +398,101 @@ function Exerciser({ user, onUserChange }) {
     return groups;
   }, {});
 
+  const workoutDates = new Set(workouts.map((w) => w.date));
+
+  const exerciseOptionsByBodyPart = workouts.reduce((groups, w) => {
+    if (!groups[w.body_part]) groups[w.body_part] = [];
+    if (!groups[w.body_part].some((e) => e.id === w.assigned_workout_id)) {
+      groups[w.body_part].push({ id: w.assigned_workout_id, exercise: w.exercise });
+    }
+    return groups;
+  }, {});
+
+  const exerciseHistory = exerciseFilterId
+    ? workouts.filter((w) => w.assigned_workout_id === exerciseFilterId)
+    : [];
+
+  const goToMonth = (delta) => {
+    setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + delta, 1));
+  };
+
+  const renderWorkoutCard = (item, { showDate = false } = {}) => {
+    const meta = bodyPartMeta(item.body_part);
+    return (
+      <div className="card" key={item.id}>
+        <div className="row-between">
+          <div className="card-title">{item.exercise}</div>
+          <span className={`tag ${meta.tagClass}`}>
+            {meta.icon} {meta.label}
+          </span>
+        </div>
+        {showDate && <div className="card-subtitle">{formatDateLabel(item.date)}</div>}
+        <div className="card-subtitle">Assigned by {item.trainer_name}</div>
+
+        {editingWorkoutId === item.id ? (
+          <form onSubmit={(e) => submitEditWorkout(e, item.id)}>
+            {editWorkoutSets.map((row, idx) => (
+              <div className="form-row" key={idx}>
+                <div className="form-group">
+                  <label className="form-label">Set {idx + 1} Weight (kg)</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="0"
+                    value={row.weight}
+                    onChange={(e) => updateEditSetRow(idx, "weight", e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Reps</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="1"
+                    value={row.reps}
+                    onChange={(e) => updateEditSetRow(idx, "reps", e.target.value)}
+                  />
+                </div>
+                {editWorkoutSets.length > 1 && (
+                  <button
+                    className="btn btn-outline"
+                    type="button"
+                    onClick={() => removeEditSetRow(idx)}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+            <button className="btn btn-outline" type="button" onClick={addEditSetRow}>
+              ➕ Add Set
+            </button>
+            <div className="row-between">
+              <button className="btn btn-success" type="submit">Save</button>
+              <button className="btn btn-outline" type="button" onClick={cancelEditWorkout}>Cancel</button>
+            </div>
+          </form>
+        ) : (
+          <>
+            {item.sets.map((s) => (
+              <div className="card-subtitle" key={s.set_number}>
+                Set {s.set_number}: {s.weight}kg x {s.reps} reps
+              </div>
+            ))}
+            <div className="row-between">
+              <button className="btn btn-outline" type="button" onClick={() => startEditWorkout(item)}>
+                Edit
+              </button>
+              <button className="btn btn-outline" type="button" onClick={() => deleteWorkoutEntry(item.id)}>
+                Delete
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
   if (loading) {
     return <div className="loading-screen">Loading…</div>;
   }
@@ -547,90 +674,141 @@ function Exerciser({ user, onUserChange }) {
 
         {error && <div className="auth-error">{error}</div>}
 
-        {Object.keys(groupedHistory).length === 0 && (
-          <div className="card-subtitle">No workouts logged yet.</div>
+        <div className="filter-tabs">
+          <button
+            className={`filter-tab ${historyView === "list" ? "active" : ""}`}
+            onClick={() => setHistoryView("list")}
+          >
+            📜 List
+          </button>
+          <button
+            className={`filter-tab ${historyView === "calendar" ? "active" : ""}`}
+            onClick={() => setHistoryView("calendar")}
+          >
+            📅 Calendar
+          </button>
+          <button
+            className={`filter-tab ${historyView === "exercise" ? "active" : ""}`}
+            onClick={() => setHistoryView("exercise")}
+          >
+            🏋️ By Exercise
+          </button>
+        </div>
+
+        {historyView === "list" && (
+          <>
+            {Object.keys(groupedHistory).length === 0 && (
+              <div className="card-subtitle">No workouts logged yet.</div>
+            )}
+            {Object.entries(groupedHistory).map(([date, items]) => (
+              <div className="date-group" key={date}>
+                <div className="date-heading">{formatDateLabel(date)}</div>
+                {items.map((item) => renderWorkoutCard(item))}
+              </div>
+            ))}
+          </>
         )}
 
-        {Object.entries(groupedHistory).map(([date, items]) => (
-          <div className="date-group" key={date}>
-            <div className="date-heading">{formatDateLabel(date)}</div>
-            {items.map((item) => {
-              const meta = bodyPartMeta(item.body_part);
-              return (
-                <div className="card" key={item.id}>
-                  <div className="row-between">
-                    <div className="card-title">{item.exercise}</div>
-                    <span className={`tag ${meta.tagClass}`}>
-                      {meta.icon} {meta.label}
-                    </span>
-                  </div>
-                  <div className="card-subtitle">Assigned by {item.trainer_name}</div>
+        {historyView === "calendar" && (
+          <div>
+            <div className="calendar-header">
+              <button className="calendar-nav-btn" type="button" onClick={() => goToMonth(-1)}>‹</button>
+              <span className="calendar-header-title">
+                {calendarMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+              </span>
+              <button className="calendar-nav-btn" type="button" onClick={() => goToMonth(1)}>›</button>
+            </div>
+            <div className="calendar-grid">
+              {WEEKDAY_LABELS.map((label, idx) => (
+                <div className="calendar-weekday" key={idx}>{label}</div>
+              ))}
+              {buildCalendarCells(calendarMonth).map((dateStr, idx) => {
+                if (!dateStr) return <div className="calendar-day empty" key={idx} />;
+                const dayNum = Number(dateStr.slice(-2));
+                const classes = ["calendar-day"];
+                if (workoutDates.has(dateStr)) classes.push("has-workout");
+                if (dateStr === selectedDate) classes.push("selected");
+                if (dateStr === toLocalDateStr(new Date())) classes.push("today");
+                return (
+                  <button
+                    key={dateStr}
+                    type="button"
+                    className={classes.join(" ")}
+                    onClick={() => setSelectedDate(dateStr)}
+                  >
+                    {dayNum}
+                  </button>
+                );
+              })}
+            </div>
 
-                  {editingWorkoutId === item.id ? (
-                    <form onSubmit={(e) => submitEditWorkout(e, item.id)}>
-                      {editWorkoutSets.map((row, idx) => (
-                        <div className="form-row" key={idx}>
-                          <div className="form-group">
-                            <label className="form-label">Set {idx + 1} Weight (kg)</label>
-                            <input
-                              className="form-input"
-                              type="number"
-                              min="0"
-                              value={row.weight}
-                              onChange={(e) => updateEditSetRow(idx, "weight", e.target.value)}
-                            />
-                          </div>
-                          <div className="form-group">
-                            <label className="form-label">Reps</label>
-                            <input
-                              className="form-input"
-                              type="number"
-                              min="1"
-                              value={row.reps}
-                              onChange={(e) => updateEditSetRow(idx, "reps", e.target.value)}
-                            />
-                          </div>
-                          {editWorkoutSets.length > 1 && (
-                            <button
-                              className="btn btn-outline"
-                              type="button"
-                              onClick={() => removeEditSetRow(idx)}
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                      <button className="btn btn-outline" type="button" onClick={addEditSetRow}>
-                        ➕ Add Set
-                      </button>
-                      <div className="row-between">
-                        <button className="btn btn-success" type="submit">Save</button>
-                        <button className="btn btn-outline" type="button" onClick={cancelEditWorkout}>Cancel</button>
-                      </div>
-                    </form>
-                  ) : (
-                    <>
-                      {item.sets.map((s) => (
-                        <div className="card-subtitle" key={s.set_number}>
-                          Set {s.set_number}: {s.weight}kg x {s.reps} reps
-                        </div>
-                      ))}
-                      <div className="row-between">
-                        <button className="btn btn-outline" type="button" onClick={() => startEditWorkout(item)}>
-                          Edit
-                        </button>
-                        <button className="btn btn-outline" type="button" onClick={() => deleteWorkoutEntry(item.id)}>
-                          Delete
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
+            <div className="section">
+              <div className="date-heading">{formatDateLabel(selectedDate)}</div>
+              {(groupedHistory[selectedDate] || []).length === 0 ? (
+                <div className="card-subtitle">No workouts logged on this date.</div>
+              ) : (
+                groupedHistory[selectedDate].map((item) => renderWorkoutCard(item))
+              )}
+            </div>
           </div>
-        ))}
+        )}
+
+        {historyView === "exercise" && (
+          <div>
+            {Object.keys(exerciseOptionsByBodyPart).length === 0 ? (
+              <div className="card-subtitle">No workouts logged yet.</div>
+            ) : (
+              <>
+                <div className="form-group">
+                  <label className="form-label">Body Part</label>
+                  <div className="chip-row">
+                    {BODY_PARTS.filter((part) => exerciseOptionsByBodyPart[part.id]).map((part) => (
+                      <button
+                        key={part.id}
+                        type="button"
+                        className={`chip ${exerciseFilterBodyPart === part.id ? "active" : ""}`}
+                        onClick={() => {
+                          setExerciseFilterBodyPart(part.id);
+                          setExerciseFilterId(null);
+                        }}
+                      >
+                        <span className="chip-icon">{part.icon}</span>
+                        <span>{part.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {exerciseFilterBodyPart && (
+                  <div className="form-group">
+                    <label className="form-label">Exercise</label>
+                    <select
+                      className="form-select"
+                      value={exerciseFilterId || ""}
+                      onChange={(e) => setExerciseFilterId(Number(e.target.value) || null)}
+                    >
+                      <option value="">Select an exercise</option>
+                      {exerciseOptionsByBodyPart[exerciseFilterBodyPart].map((opt) => (
+                        <option key={opt.id} value={opt.id}>{opt.exercise}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {exerciseFilterId && (
+                  <div className="section">
+                    <div className="section-title">Recent Records</div>
+                    {exerciseHistory.length === 0 ? (
+                      <div className="card-subtitle">No history logged for this exercise yet.</div>
+                    ) : (
+                      exerciseHistory.map((item) => renderWorkoutCard(item, { showDate: true }))
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     );
   }
