@@ -5,7 +5,7 @@ import { formatDateLabel, formatJoinedDate, sinceLabel } from "../utils/format";
 import { telHref, whatsappHref } from "../utils/phone";
 import { ACTIVITY_LEVELS, BMI_CATEGORY_CLASS, GENDERS } from "../utils/health";
 import { api } from "../api/client";
-import { screenTransition, cardTransition, tabContent, tapScale } from "../utils/motion";
+import { screenTransition, cardTransition, tabContent, tapScale, popIn } from "../utils/motion";
 
 const CARDIO_TYPES = [
   { id: "Running", icon: "🏃" },
@@ -418,10 +418,10 @@ function Exerciser({ user, onUserChange }) {
     setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + delta, 1));
   };
 
-  const renderWorkoutCard = (item, { showDate = false, index = 0 } = {}) => {
+  const renderWorkoutCard = (item, { showDate = false, index = 0, anim } = {}) => {
     const meta = bodyPartMeta(item.body_part);
     return (
-      <motion.div className="card" key={item.id} {...cardTransition(index)}>
+      <motion.div className="card" key={item.id} {...(anim || cardTransition(index))}>
         <div className="row-between">
           <div className="card-title">{item.exercise}</div>
           <span className={`tag ${meta.tagClass}`}>
@@ -829,11 +829,17 @@ function Exerciser({ user, onUserChange }) {
 
                 {exerciseFilterId && (
                   <div className="section">
-                    <div className="section-title">Recent Records</div>
+                    <div className="section-title">Latest Record</div>
+                    <div className="info-box">
+                      Showing only your most recent logged session for this exercise. For full history, switch
+                      to the List or Calendar view.
+                    </div>
                     {exerciseHistory.length === 0 ? (
                       <div className="card-subtitle">No history logged for this exercise yet.</div>
                     ) : (
-                      exerciseHistory.map((item, idx) => renderWorkoutCard(item, { showDate: true, index: idx }))
+                      <AnimatePresence mode="wait">
+                        {renderWorkoutCard(exerciseHistory[0], { showDate: true, anim: popIn })}
+                      </AnimatePresence>
                     )}
                   </div>
                 )}

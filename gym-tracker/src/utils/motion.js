@@ -26,3 +26,12 @@ export const tabContent = {
 
 // Subtle press feedback for buttons.
 export const tapScale = { scale: 0.97 };
+
+// Eye-catching pop-in/out for a single highlighted card (e.g. "latest record"),
+// with a slight overshoot for a springy feel.
+export const popIn = {
+  initial: { opacity: 0, scale: 0.92, y: 12 },
+  animate: { opacity: 1, scale: 1, y: 0 },
+  exit: { opacity: 0, scale: 0.95, y: -8 },
+  transition: { duration: 0.3, ease: [0.34, 1.56, 0.64, 1] },
+};
