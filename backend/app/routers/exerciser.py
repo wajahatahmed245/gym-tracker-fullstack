@@ -46,12 +46,14 @@ require_exerciser = require_role(Role.exerciser)
 
 
 def _workout_out(workout: Workout) -> WorkoutOut:
+    assigned = workout.assigned_workout
+    trainer = assigned.trainer
     return WorkoutOut(
         id=workout.id,
         assigned_workout_id=workout.assigned_workout_id,
-        body_part=workout.assigned_workout.body_part,
-        exercise=workout.assigned_workout.exercise,
-        trainer_name=workout.assigned_workout.trainer.name,
+        body_part=assigned.body_part,
+        exercise=assigned.exercise,
+        trainer_name=trainer.name if trainer else "Former trainer",
         date=workout.date,
         sets=[
             WorkoutSetOut(set_number=s.set_number, reps=s.reps, weight=s.weight)
