@@ -20,6 +20,7 @@ from ..models import (
     Role,
     TrainerNote,
     TrainerProfile,
+    Unavailability,
     User,
     Workout,
     WorkoutSet,
@@ -34,6 +35,7 @@ from ..schemas import (
     LeaveNoteIn,
     TrainerListItem,
     TrainerSelect,
+    UnavailableDateOut,
     WorkoutLogCreate,
     WorkoutOut,
     WorkoutSetOut,
@@ -282,6 +284,19 @@ def select_trainer(payload: TrainerSelect, user: User = Depends(require_exercise
         experience_years=trainer.trainer_profile.experience_years,
         phone=trainer.trainer_profile.phone,
     )
+
+
+@router.get("/exerciser/trainer/unavailability", response_model=List[UnavailableDateOut])
+def trainer_unavailability(user: User = Depends(require_exerciser), db: Session = Depends(get_db)):
+    trainer_id = user.exerciser_profile.trainer_id
+    if trainer_id is None:
+        return []
+
+    return db.execute(
+        select(Unavailability)
+        .where(Unavailability.user_id == trainer_id, Unavailability.date >= date.today())
+        .order_by(Unavailability.date.asc())
+    ).scalars().all()
 
 
 @router.delete("/exerciser/trainer", response_model=ExerciserProfileOut)

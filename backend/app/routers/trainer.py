@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -11,13 +12,14 @@ from .. import health as health_calc
 from ..database import get_db
 from ..deps import require_approved_trainer
 from ..logging_config import logger
-from ..models import AssignedWorkout, ExerciserProfile, NoteAuthor, TrainerNote, User, Workout
+from ..models import AssignedWorkout, ExerciserProfile, NoteAuthor, TrainerNote, Unavailability, User, Workout
 from ..schemas import (
     AssignWorkoutCreate,
     AssignedWorkoutOut,
     AssignedWorkoutUpdate,
     ClientDetailOut,
     ClientOut,
+    ClientUnavailabilityOut,
     LeaveNoteIn,
     RecentWorkoutItem,
     TrainerNoteOut,
@@ -69,6 +71,26 @@ def list_clients(trainer: User = Depends(require_approved_trainer), db: Session 
     return result
 
 
+@router.get("/clients/unavailability", response_model=List[ClientUnavailabilityOut])
+def clients_unavailability(trainer: User = Depends(require_approved_trainer), db: Session = Depends(get_db)):
+    clients = db.execute(
+        select(User)
+        .join(ExerciserProfile, ExerciserProfile.user_id == User.id)
+        .where(ExerciserProfile.trainer_id == trainer.id)
+    ).scalars().all()
+
+    result = []
+    for client in clients:
+        dates = db.execute(
+            select(Unavailability.date)
+            .where(Unavailability.user_id == client.id, Unavailability.date >= date.today())
+            .order_by(Unavailability.date.asc())
+        ).scalars().all()
+        if dates:
+            result.append(ClientUnavailabilityOut(exerciser_id=client.id, name=client.name, dates=dates))
+    return result
+
+
 @router.get("/clients/{exerciser_id}", response_model=ClientDetailOut)
 def client_detail(
     exerciser_id: int,
@@ -111,6 +133,12 @@ def client_detail(
         profile.height_cm, profile.weight_kg, profile.age, profile.gender, profile.activity_level
     )
 
+    unavailable_dates = db.execute(
+        select(Unavailability.date)
+        .where(Unavailability.user_id == client.id, Unavailability.date >= date.today())
+        .order_by(Unavailability.date.asc())
+    ).scalars().all()
+
     return ClientDetailOut(
         id=client.id,
         name=client.name,
@@ -119,6 +147,8 @@ def client_detail(
         streak=crud.compute_streak(dates),
         joined_at=profile.trainer_joined_at,
         health=metrics,
+        phone=profile.phone,
+        unavailable_dates=unavailable_dates,
         assigned_workouts=assigned,
         recent_workouts=recent,
     )
@@ -136,6 +166,17 @@ def assign_workout(
     db: Session = Depends(get_db),
 ):
     client = _get_client_or_404(db, trainer, exerciser_id)
+
+    is_unavailable_today = db.execute(
+        select(Unavailability).where(
+            Unavailability.user_id == client.id, Unavailability.date == date.today()
+        )
+    ).scalars().first()
+    if is_unavailable_today is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"{client.name} has marked today as unavailable",
+        )
 
     assigned = AssignedWorkout(
         exerciser_id=client.id,

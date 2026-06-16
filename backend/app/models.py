@@ -13,6 +13,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -114,6 +115,11 @@ class User(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    unavailable_dates: Mapped[List["Unavailability"]] = relationship(
+        "Unavailability",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
 
 class ExerciserProfile(Base):
@@ -129,6 +135,7 @@ class ExerciserProfile(Base):
     age: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     gender: Mapped[Optional[Gender]] = mapped_column(Enum(Gender), nullable=True)
     activity_level: Mapped[Optional[ActivityLevel]] = mapped_column(Enum(ActivityLevel), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="exerciser_profile", foreign_keys=[user_id])
     trainer: Mapped[Optional["User"]] = relationship("User", foreign_keys=[trainer_id])
@@ -222,3 +229,15 @@ class TrainerNote(Base):
     author: Mapped[NoteAuthor] = mapped_column(Enum(NoteAuthor), nullable=False)
     note: Mapped[str] = mapped_column(String(1000), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class Unavailability(Base):
+    __tablename__ = "unavailable_dates"
+    __table_args__ = (UniqueConstraint("user_id", "date", name="uq_unavailable_dates_user_date"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped["User"] = relationship("User", back_populates="unavailable_dates")

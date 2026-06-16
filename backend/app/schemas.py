@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date as date_type, datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from . import health as health_calc
 from .models import (
@@ -27,6 +27,7 @@ class ExerciserSignup(BaseModel):
     name: str
     email: EmailStr
     password: str = Field(min_length=6)
+    phone: str = Field(min_length=7, max_length=30)
     goal: Goal = Goal.general_fitness
     height_cm: Optional[float] = Field(default=None, gt=0, le=300)
     weight_kg: Optional[float] = Field(default=None, gt=0, le=500)
@@ -82,6 +83,7 @@ class ExerciserProfileOut(BaseModel):
     age: Optional[int] = None
     gender: Optional[Gender] = None
     activity_level: Optional[ActivityLevel] = None
+    phone: Optional[str] = None
     health: Optional[HealthMetricsOut] = None
 
     @model_validator(mode="after")
@@ -206,6 +208,26 @@ class WorkoutUpdate(BaseModel):
     date: Optional[date_type] = None
 
 
+# ---------- Availability ----------
+
+
+class UnavailableDateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    date: date_type
+
+
+class UnavailabilityCreate(BaseModel):
+    date: date_type
+
+    @field_validator("date")
+    @classmethod
+    def _not_in_past(cls, value: date_type) -> date_type:
+        if value < date_type.today():
+            raise ValueError("Date cannot be in the past")
+        return value
+
+
 # ---------- Trainer ----------
 
 
@@ -216,6 +238,12 @@ class ClientOut(BaseModel):
     total_workouts: int
     streak: int
     joined_at: Optional[datetime] = None
+
+
+class ClientUnavailabilityOut(BaseModel):
+    exerciser_id: int
+    name: str
+    dates: List[date_type]
 
 
 class RecentWorkoutItem(BaseModel):
@@ -234,6 +262,8 @@ class ClientDetailOut(BaseModel):
     streak: int
     joined_at: Optional[datetime] = None
     health: Optional[HealthMetricsOut] = None
+    phone: Optional[str] = None
+    unavailable_dates: List[date_type] = Field(default_factory=list)
     assigned_workouts: List[AssignedWorkoutOut]
     recent_workouts: List[RecentWorkoutItem]
 
@@ -273,6 +303,7 @@ class AdminUserOut(BaseModel):
     email: EmailStr
     status: AccountStatus
     goal: Optional[Goal] = None
+    phone: Optional[str] = None
 
 
 class AdminTrainerOut(BaseModel):
@@ -283,6 +314,7 @@ class AdminTrainerOut(BaseModel):
     specialty: Specialty
     experience_years: int
     approval_status: ApprovalStatus
+    phone: Optional[str] = None
 
 
 class StatusUpdate(BaseModel):
@@ -291,3 +323,19 @@ class StatusUpdate(BaseModel):
 
 class PasswordUpdate(BaseModel):
     new_password: str = Field(min_length=6)
+
+
+class PhoneUpdate(BaseModel):
+    phone: Optional[str] = Field(default=None, max_length=30)
+
+    @field_validator("phone")
+    @classmethod
+    def _normalize_phone(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            return None
+        if len(value) < 7:
+            raise ValueError("Phone number is too short")
+        return value

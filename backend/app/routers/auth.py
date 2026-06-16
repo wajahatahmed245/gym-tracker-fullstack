@@ -55,6 +55,7 @@ def signup_exerciser(payload: ExerciserSignup, db: Session = Depends(get_db)):
         age=payload.age,
         gender=payload.gender,
         activity_level=payload.activity_level,
+        phone=payload.phone,
     )
     db.add(profile)
     db.commit()

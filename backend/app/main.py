@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import BASE_DIR, settings
 from .database import SessionLocal
 from .logging_config import logger, setup_logging
-from .routers import admin, auth, exerciser, trainer
+from .routers import admin, auth, availability, exerciser, trainer
 from .seed import seed_admin
 
 setup_logging()
@@ -56,6 +56,7 @@ def on_startup() -> None:
 
 
 app.include_router(auth.router)
+app.include_router(availability.router)
 app.include_router(exerciser.router)
 app.include_router(trainer.router)
 app.include_router(admin.router)
