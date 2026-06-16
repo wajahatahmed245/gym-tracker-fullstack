@@ -16,6 +16,7 @@ from ..schemas import (
     AdminTrainerOut,
     AdminUserOut,
     PasswordUpdate,
+    PhoneUpdate,
     StatusUpdate,
 )
 from ..security import hash_password
@@ -30,6 +31,30 @@ def _get_user_with_role_or_404(db: Session, user_id: int, role: Role) -> User:
     if user is None or user.role != role:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     return user
+
+
+def _admin_user_out(user: User) -> AdminUserOut:
+    return AdminUserOut(
+        id=user.id,
+        name=user.name,
+        email=user.email,
+        status=user.status,
+        goal=user.exerciser_profile.goal if user.exerciser_profile else None,
+        phone=user.exerciser_profile.phone if user.exerciser_profile else None,
+    )
+
+
+def _admin_trainer_out(trainer: User) -> AdminTrainerOut:
+    return AdminTrainerOut(
+        id=trainer.id,
+        name=trainer.name,
+        email=trainer.email,
+        status=trainer.status,
+        specialty=trainer.trainer_profile.specialty,
+        experience_years=trainer.trainer_profile.experience_years,
+        approval_status=trainer.trainer_profile.approval_status,
+        phone=trainer.trainer_profile.phone,
+    )
 
 
 @router.get("/dashboard", response_model=AdminDashboardOut)
@@ -56,28 +81,13 @@ def list_users(
         query = query.where(User.status == status_filter)
 
     users = db.execute(query).scalars().all()
-    return [
-        AdminUserOut(
-            id=u.id,
-            name=u.name,
-            email=u.email,
-            status=u.status,
-            goal=u.exerciser_profile.goal if u.exerciser_profile else None,
-        )
-        for u in users
-    ]
+    return [_admin_user_out(u) for u in users]
 
 
 @router.get("/users/{user_id}", response_model=AdminUserOut)
 def get_user(user_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     user = _get_user_with_role_or_404(db, user_id, Role.exerciser)
-    return AdminUserOut(
-        id=user.id,
-        name=user.name,
-        email=user.email,
-        status=user.status,
-        goal=user.exerciser_profile.goal if user.exerciser_profile else None,
-    )
+    return _admin_user_out(user)
 
 
 @router.patch("/users/{user_id}/status", response_model=AdminUserOut)
@@ -93,13 +103,26 @@ def set_user_status(
 
     logger.info("Admin id=%s set user id=%s status=%s", admin.id, user.id, payload.status.value)
 
-    return AdminUserOut(
-        id=user.id,
-        name=user.name,
-        email=user.email,
-        status=user.status,
-        goal=user.exerciser_profile.goal if user.exerciser_profile else None,
-    )
+    return _admin_user_out(user)
+
+
+@router.patch("/users/{user_id}/phone", response_model=AdminUserOut)
+def set_user_phone(
+    user_id: int,
+    payload: PhoneUpdate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    user = _get_user_with_role_or_404(db, user_id, Role.exerciser)
+    if user.exerciser_profile is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exerciser profile not found")
+
+    user.exerciser_profile.phone = payload.phone
+    db.commit()
+
+    logger.info("Admin id=%s set phone for user id=%s", admin.id, user.id)
+
+    return _admin_user_out(user)
 
 
 @router.patch("/users/{user_id}/password", status_code=status.HTTP_204_NO_CONTENT)
@@ -131,32 +154,13 @@ def delete_user(user_id: int, admin: User = Depends(require_admin), db: Session 
 @router.get("/trainers", response_model=List[AdminTrainerOut])
 def list_trainers(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     trainers = db.execute(select(User).where(User.role == Role.trainer)).scalars().all()
-    return [
-        AdminTrainerOut(
-            id=t.id,
-            name=t.name,
-            email=t.email,
-            status=t.status,
-            specialty=t.trainer_profile.specialty,
-            experience_years=t.trainer_profile.experience_years,
-            approval_status=t.trainer_profile.approval_status,
-        )
-        for t in trainers
-    ]
+    return [_admin_trainer_out(t) for t in trainers]
 
 
 @router.get("/trainers/{trainer_id}", response_model=AdminTrainerOut)
 def get_trainer(trainer_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     trainer = _get_user_with_role_or_404(db, trainer_id, Role.trainer)
-    return AdminTrainerOut(
-        id=trainer.id,
-        name=trainer.name,
-        email=trainer.email,
-        status=trainer.status,
-        specialty=trainer.trainer_profile.specialty,
-        experience_years=trainer.trainer_profile.experience_years,
-        approval_status=trainer.trainer_profile.approval_status,
-    )
+    return _admin_trainer_out(trainer)
 
 
 @router.patch("/trainers/{trainer_id}/approve", response_model=AdminTrainerOut)
@@ -167,15 +171,7 @@ def approve_trainer(trainer_id: int, admin: User = Depends(require_admin), db: S
 
     logger.info("Admin id=%s approved trainer id=%s", admin.id, trainer.id)
 
-    return AdminTrainerOut(
-        id=trainer.id,
-        name=trainer.name,
-        email=trainer.email,
-        status=trainer.status,
-        specialty=trainer.trainer_profile.specialty,
-        experience_years=trainer.trainer_profile.experience_years,
-        approval_status=trainer.trainer_profile.approval_status,
-    )
+    return _admin_trainer_out(trainer)
 
 
 @router.patch("/trainers/{trainer_id}/status", response_model=AdminTrainerOut)
@@ -191,15 +187,23 @@ def set_trainer_status(
 
     logger.info("Admin id=%s set trainer id=%s status=%s", admin.id, trainer.id, payload.status.value)
 
-    return AdminTrainerOut(
-        id=trainer.id,
-        name=trainer.name,
-        email=trainer.email,
-        status=trainer.status,
-        specialty=trainer.trainer_profile.specialty,
-        experience_years=trainer.trainer_profile.experience_years,
-        approval_status=trainer.trainer_profile.approval_status,
-    )
+    return _admin_trainer_out(trainer)
+
+
+@router.patch("/trainers/{trainer_id}/phone", response_model=AdminTrainerOut)
+def set_trainer_phone(
+    trainer_id: int,
+    payload: PhoneUpdate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    trainer = _get_user_with_role_or_404(db, trainer_id, Role.trainer)
+    trainer.trainer_profile.phone = payload.phone
+    db.commit()
+
+    logger.info("Admin id=%s set phone for trainer id=%s", admin.id, trainer.id)
+
+    return _admin_trainer_out(trainer)
 
 
 @router.patch("/trainers/{trainer_id}/password", status_code=status.HTTP_204_NO_CONTENT)

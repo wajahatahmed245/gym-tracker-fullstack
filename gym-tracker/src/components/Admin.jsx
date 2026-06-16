@@ -92,6 +92,16 @@ function Admin() {
     }
   };
 
+  const updateUserPhone = async (id, phone) => {
+    await api.updateUserPhone(id, phone);
+    setUsers(await api.adminUsers());
+  };
+
+  const updateTrainerPhone = async (id, phone) => {
+    await api.updateTrainerPhone(id, phone);
+    setTrainers(await api.adminTrainers());
+  };
+
   const deleteTrainer = async (id) => {
     setError("");
     try {
@@ -133,6 +143,7 @@ function Admin() {
               <div className="card-title">{selectedUser.name}</div>
               <div className="card-subtitle">{selectedUser.email}</div>
               {selectedUser.goal && <div className="card-subtitle">Goal: {selectedUser.goal}</div>}
+              {selectedUser.phone && <div className="card-subtitle">📞 {selectedUser.phone}</div>}
             </div>
             <span className={`badge badge-${selectedUser.status}`}>
               {cap(selectedUser.status)}
@@ -151,7 +162,9 @@ function Admin() {
         <AccountActions
           name={selectedUser.name}
           label="User"
+          phone={selectedUser.phone}
           onChangePassword={(newPassword) => api.resetUserPassword(selectedUser.id, newPassword)}
+          onChangePhone={(phone) => updateUserPhone(selectedUser.id, phone)}
           onDelete={() => deleteUser(selectedUser.id)}
         />
       </motion.div>
@@ -181,6 +194,7 @@ function Admin() {
               <div className="card-subtitle">
                 {selectedTrainer.specialty} · {selectedTrainer.experience_years} yrs
               </div>
+              {selectedTrainer.phone && <div className="card-subtitle">📞 {selectedTrainer.phone}</div>}
             </div>
           </div>
           <div className="action-row">
@@ -219,7 +233,9 @@ function Admin() {
         <AccountActions
           name={selectedTrainer.name}
           label="Trainer"
+          phone={selectedTrainer.phone}
           onChangePassword={(newPassword) => api.resetTrainerPassword(selectedTrainer.id, newPassword)}
+          onChangePhone={(phone) => updateTrainerPhone(selectedTrainer.id, phone)}
           onDelete={() => deleteTrainer(selectedTrainer.id)}
         />
       </motion.div>
