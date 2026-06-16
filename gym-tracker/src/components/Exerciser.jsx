@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { BODY_PARTS, bodyPartMeta } from "../utils/bodyParts";
 import { formatDateLabel, formatJoinedDate, sinceLabel } from "../utils/format";
-import { telHref, whatsappHref } from "../utils/phone";
+import { telHref, whatsappHref, buildLeaveMessage } from "../utils/phone";
 import { ACTIVITY_LEVELS, BMI_CATEGORY_CLASS, GENDERS } from "../utils/health";
+import { toLocalDateStr, buildCalendarCells, WEEKDAY_LABELS } from "../utils/calendar";
 import { api } from "../api/client";
 import { screenTransition, cardTransition, tabContent, tapScale, popIn } from "../utils/motion";
+import AvailabilityCalendar from "./AvailabilityCalendar";
+import UnavailabilityTicker from "./UnavailabilityTicker";
 
 const CARDIO_TYPES = [
   { id: "Running", icon: "🏃" },
@@ -15,29 +18,6 @@ const CARDIO_TYPES = [
   { id: "Walking", icon: "🚶" },
   { id: "Elliptical", icon: "🏃‍♀️" },
 ];
-
-const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
-
-function toLocalDateStr(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function buildCalendarCells(monthDate) {
-  const year = monthDate.getFullYear();
-  const month = monthDate.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const startWeekday = new Date(year, month, 1).getDay();
-
-  const cells = [];
-  for (let i = 0; i < startWeekday; i++) cells.push(null);
-  for (let day = 1; day <= daysInMonth; day++) {
-    cells.push(`${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
-  }
-  return cells;
-}
 
 function HealthCard({ health, currentWeight }) {
   const { healthy_weight_min_kg: min, healthy_weight_max_kg: max } = health;
@@ -134,8 +114,21 @@ function Exerciser({ user, onUserChange }) {
   const [exerciseFilterBodyPart, setExerciseFilterBodyPart] = useState(null);
   const [exerciseFilterId, setExerciseFilterId] = useState(null);
 
+  const [myUnavailableDates, setMyUnavailableDates] = useState([]);
+  const [trainerUnavailableDates, setTrainerUnavailableDates] = useState([]);
+
   const trainerId = user?.exerciser_profile?.trainer_id || null;
   const currentTrainer = trainers.find((t) => t.id === trainerId);
+
+  const unavailabilityTickerItems = [
+    ...myUnavailableDates.map((d) => ({ icon: "🚫", date: d, mine: true, label: `You: ${formatDateLabel(d)}` })),
+    ...trainerUnavailableDates.map((d) => ({
+      icon: "🧑‍🏫",
+      date: d,
+      mine: false,
+      label: `${currentTrainer?.name || "Trainer"}: ${formatDateLabel(d)}`,
+    })),
+  ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
   useEffect(() => {
     let cancelled = false;
@@ -184,6 +177,36 @@ function Exerciser({ user, onUserChange }) {
       clearInterval(interval);
     };
   }, [screen]);
+
+  useEffect(() => {
+    if (screen !== "home" && screen !== "availability") return;
+    let cancelled = false;
+
+    const fetchUnavailability = () => {
+      api
+        .myUnavailability()
+        .then((rows) => {
+          if (!cancelled) setMyUnavailableDates(rows.map((r) => r.date));
+        })
+        .catch(() => {});
+
+      if (trainerId) {
+        api
+          .trainerUnavailability()
+          .then((rows) => {
+            if (!cancelled) setTrainerUnavailableDates(rows.map((r) => r.date));
+          })
+          .catch(() => {});
+      }
+    };
+
+    fetchUnavailability();
+    const interval = setInterval(fetchUnavailability, 8000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [screen, trainerId]);
 
   const goHome = () => {
     setSavedMessage("");
@@ -511,6 +534,9 @@ function Exerciser({ user, onUserChange }) {
             {error}
           </motion.div>
         )}
+
+        <UnavailabilityTicker items={unavailabilityTickerItems} />
+
         <div className="hero-card">
           <div className="hero-greeting">Welcome back, {user?.name} 👋</div>
           {currentTrainer && (
@@ -567,6 +593,9 @@ function Exerciser({ user, onUserChange }) {
             </motion.button>
             <motion.button className="btn" whileTap={tapScale} onClick={openHealth}>
               ⚖️ My Health
+            </motion.button>
+            <motion.button className="btn" whileTap={tapScale} onClick={() => setScreen("availability")}>
+              🗓️ My Availability
             </motion.button>
           </div>
         </div>
@@ -1018,6 +1047,52 @@ function Exerciser({ user, onUserChange }) {
             </motion.div>
           ))}
         </div>
+      </motion.div>
+    );
+  }
+
+  if (screen === "availability") {
+    const formattedMyDates = myUnavailableDates.map((d) => formatDateLabel(d));
+
+    return (
+      <motion.div {...screenTransition}>
+        <div className="screen-header">
+          <button className="back-button" onClick={goHome}>←</button>
+          <span className="screen-title">My Availability</span>
+        </div>
+
+        <AvailabilityCalendar
+          title="Days you're unavailable"
+          subtitle="Your trainer won't be able to assign new exercises on these days."
+          onChange={setMyUnavailableDates}
+        />
+
+        {currentTrainer?.phone && myUnavailableDates.length > 0 && (
+          <a
+            className="btn btn-success"
+            style={{ marginTop: "12px" }}
+            href={whatsappHref(currentTrainer.phone, buildLeaveMessage(formattedMyDates))}
+            target="_blank"
+            rel="noreferrer"
+          >
+            📲 Notify {currentTrainer.name} via WhatsApp
+          </a>
+        )}
+
+        {currentTrainer && (
+          <div className="section">
+            <div className="section-title">{currentTrainer.name}'s upcoming leave days</div>
+            {trainerUnavailableDates.length === 0 ? (
+              <div className="card-subtitle">No upcoming leave days.</div>
+            ) : (
+              <div className="chip-row">
+                {trainerUnavailableDates.map((d) => (
+                  <span className="chip" key={d}>{formatDateLabel(d)}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </motion.div>
     );
   }

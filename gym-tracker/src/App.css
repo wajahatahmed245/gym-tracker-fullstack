@@ -801,6 +801,22 @@ body {
   background: #ffffff;
 }
 
+.calendar-day.unavailable {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.calendar-day.unavailable.selected {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: #ffffff;
+}
+
+.calendar-day.disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
 /* ---------- Approve/reject row ---------- */
 .action-row {
   display: flex;
@@ -886,6 +902,76 @@ body {
   margin-top: 4px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+/* ---------- Unavailability ticker ---------- */
+.ticker-banner {
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.ticker-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+.ticker-viewport {
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent);
+}
+
+.ticker-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+  animation: ticker-scroll var(--ticker-duration, 20s) linear infinite;
+}
+
+.ticker-banner:hover .ticker-track {
+  animation-play-state: paused;
+}
+
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.ticker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.ticker-chip.other {
+  background: var(--color-danger-bg, #fdecec);
+  color: var(--color-danger);
+}
+
+.ticker-chip-icon {
+  font-size: 14px;
+  line-height: 1;
 }
 
 /* ---------- Chip selector ---------- */

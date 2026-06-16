@@ -3,14 +3,21 @@ import { motion } from "motion/react";
 import { BODY_PARTS, bodyPartMeta } from "../utils/bodyParts";
 import { formatDateLabel, formatJoinedDate, initialsFor } from "../utils/format";
 import { BMI_CATEGORY_CLASS } from "../utils/health";
+import { whatsappHref, buildLeaveMessage } from "../utils/phone";
+import { toLocalDateStr } from "../utils/calendar";
 import { api } from "../api/client";
 import { screenTransition, cardTransition, tapScale } from "../utils/motion";
+import AvailabilityCalendar from "./AvailabilityCalendar";
+import UnavailabilityTicker from "./UnavailabilityTicker";
 
 function Trainer() {
+  const [screen, setScreen] = useState("clients");
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [myLeaveDates, setMyLeaveDates] = useState([]);
+  const [clientsUnavailable, setClientsUnavailable] = useState([]);
 
   const [selectedId, setSelectedId] = useState(null);
   const [clientDetail, setClientDetail] = useState(null);
@@ -39,6 +46,8 @@ function Trainer() {
       .finally(() => setLoading(false));
 
     api.trainerNotes().then(setNotes).catch(() => {});
+    api.myUnavailability().then((rows) => setMyLeaveDates(rows.map((r) => r.date))).catch(() => {});
+    api.clientsUnavailability().then(setClientsUnavailable).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -47,6 +56,8 @@ function Trainer() {
     const interval = setInterval(() => {
       api.clients().then(setClients).catch(() => {});
       api.trainerNotes().then(setNotes).catch(() => {});
+      api.myUnavailability().then((rows) => setMyLeaveDates(rows.map((r) => r.date))).catch(() => {});
+      api.clientsUnavailability().then(setClientsUnavailable).catch(() => {});
     }, 8000);
 
     return () => clearInterval(interval);
@@ -319,6 +330,35 @@ function Trainer() {
         )}
 
         <div className="section">
+          <div className="section-title">📅 Unavailable Days</div>
+          {clientDetail.unavailable_dates.length === 0 ? (
+            <div className="card-subtitle">No upcoming leave days.</div>
+          ) : (
+            <div className="chip-row">
+              {clientDetail.unavailable_dates.map((d) => (
+                <span className="chip" key={d}>{formatDateLabel(d)}</span>
+              ))}
+            </div>
+          )}
+          {clientDetail.unavailable_dates.includes(toLocalDateStr(new Date())) && (
+            <div className="auth-error" style={{ marginTop: "8px" }}>
+              {clientDetail.name} has marked today as unavailable — new exercises can't be assigned today.
+            </div>
+          )}
+          {clientDetail.phone && myLeaveDates.length > 0 && (
+            <a
+              className="btn btn-success"
+              style={{ marginTop: "8px" }}
+              href={whatsappHref(clientDetail.phone, buildLeaveMessage(myLeaveDates.map((d) => formatDateLabel(d))))}
+              target="_blank"
+              rel="noreferrer"
+            >
+              📲 Notify {clientDetail.name} via WhatsApp
+            </a>
+          )}
+        </div>
+
+        <div className="section">
           <div className="section-title">🏋️ Assigned Exercises</div>
           {clientDetail.assigned_workouts.length === 0 && (
             <div className="card-subtitle">No exercises assigned yet.</div>
@@ -404,11 +444,13 @@ function Trainer() {
           })}
         </div>
 
-        <div className="section">
-          <motion.button className="btn btn-primary" whileTap={tapScale} onClick={() => setShowAssign(!showAssign)}>
-            ➕ Assign New Exercise
-          </motion.button>
-        </div>
+        {!clientDetail.unavailable_dates.includes(toLocalDateStr(new Date())) && (
+          <div className="section">
+            <motion.button className="btn btn-primary" whileTap={tapScale} onClick={() => setShowAssign(!showAssign)}>
+              ➕ Assign New Exercise
+            </motion.button>
+          </div>
+        )}
 
         {showAssign && (
           <motion.form
@@ -458,8 +500,34 @@ function Trainer() {
     );
   }
 
+  if (screen === "availability") {
+    return (
+      <motion.div {...screenTransition}>
+        <div className="screen-header">
+          <button className="back-button" onClick={() => setScreen("clients")}>←</button>
+          <span className="screen-title">My Availability</span>
+        </div>
+
+        <AvailabilityCalendar
+          title="Your leave days"
+          subtitle="Clients will see these on their Availability screen"
+          onChange={setMyLeaveDates}
+        />
+      </motion.div>
+    );
+  }
+
+  const unavailabilityTickerItems = [
+    ...myLeaveDates.map((d) => ({ icon: "🧑‍🏫", date: d, mine: true, label: `You: ${formatDateLabel(d)}` })),
+    ...clientsUnavailable.flatMap((c) =>
+      c.dates.map((d) => ({ icon: "🚫", date: d, mine: false, label: `${c.name}: ${formatDateLabel(d)}` }))
+    ),
+  ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
   return (
     <motion.div {...screenTransition}>
+      <UnavailabilityTicker items={unavailabilityTickerItems} />
+
       <div className="hero-card">
         <div className="hero-greeting">👥 My Clients</div>
         <div className="hero-subtitle">
@@ -467,6 +535,12 @@ function Trainer() {
             ? "No clients yet"
             : `${clients.length} ${clients.length === 1 ? "client" : "clients"} training with you`}
         </div>
+      </div>
+
+      <div className="section">
+        <motion.button className="btn btn-outline" whileTap={tapScale} onClick={() => setScreen("availability")}>
+          🗓️ My Availability
+        </motion.button>
       </div>
 
       {error && (

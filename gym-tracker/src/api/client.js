@@ -85,9 +85,16 @@ export const api = {
   updateWorkout: (workoutId, payload) =>
     request(`/exerciser/workouts/${workoutId}`, { method: "PATCH", body: payload }),
   deleteWorkout: (workoutId) => request(`/exerciser/workouts/${workoutId}`, { method: "DELETE" }),
+  trainerUnavailability: () => request("/exerciser/trainer/unavailability"),
+
+  // ---- availability (shared) ----
+  myUnavailability: () => request("/me/unavailability"),
+  addUnavailableDate: (date) => request("/me/unavailability", { method: "POST", body: { date } }),
+  removeUnavailableDate: (date) => request(`/me/unavailability/${date}`, { method: "DELETE" }),
 
   // ---- trainer ----
   clients: () => request("/trainer/clients"),
+  clientsUnavailability: () => request("/trainer/clients/unavailability"),
   clientDetail: (id) => request(`/trainer/clients/${id}`),
   assignWorkout: (id, payload) =>
     request(`/trainer/clients/${id}/assign-workout`, { method: "POST", body: payload }),
@@ -109,6 +116,8 @@ export const api = {
     request(`/admin/users/${id}/status`, { method: "PATCH", body: { status } }),
   resetUserPassword: (id, newPassword) =>
     request(`/admin/users/${id}/password`, { method: "PATCH", body: { new_password: newPassword } }),
+  updateUserPhone: (id, phone) =>
+    request(`/admin/users/${id}/phone`, { method: "PATCH", body: { phone } }),
   deleteUser: (id) => request(`/admin/users/${id}`, { method: "DELETE" }),
 
   adminTrainers: () => request("/admin/trainers"),
@@ -117,5 +126,7 @@ export const api = {
     request(`/admin/trainers/${id}/status`, { method: "PATCH", body: { status } }),
   resetTrainerPassword: (id, newPassword) =>
     request(`/admin/trainers/${id}/password`, { method: "PATCH", body: { new_password: newPassword } }),
+  updateTrainerPhone: (id, phone) =>
+    request(`/admin/trainers/${id}/phone`, { method: "PATCH", body: { phone } }),
   deleteTrainer: (id) => request(`/admin/trainers/${id}`, { method: "DELETE" }),
 };

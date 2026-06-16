@@ -12,6 +12,7 @@ function SignupExerciser({ onSignup, onBack }) {
     email: "",
     password: "",
     confirmPassword: "",
+    phone: "",
     goal: GOALS[0],
     height: "",
     weight: "",
@@ -28,7 +29,7 @@ function SignupExerciser({ onSignup, onBack }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.password || !form.confirmPassword) {
+    if (!form.name || !form.email || !form.password || !form.confirmPassword || !form.phone) {
       setError("Please fill in all required fields.");
       return;
     }
@@ -43,6 +44,7 @@ function SignupExerciser({ onSignup, onBack }) {
         name: form.name,
         email: form.email,
         password: form.password,
+        phone: form.phone,
         goal: form.goal,
         height_cm: form.height === "" ? null : Number(form.height),
         weight_kg: form.weight === "" ? null : Number(form.weight),
@@ -96,6 +98,17 @@ function SignupExerciser({ onSignup, onBack }) {
               placeholder="you@example.com"
               value={form.email}
               onChange={(e) => handleChange("email", e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Phone Number (WhatsApp)</label>
+            <input
+              className="form-input"
+              type="tel"
+              placeholder="e.g. +92 300 1234567"
+              value={form.phone}
+              onChange={(e) => handleChange("phone", e.target.value)}
             />
           </div>
 
