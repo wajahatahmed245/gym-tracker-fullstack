@@ -95,6 +95,9 @@ function Exerciser({ user, onUserChange }) {
 
   const [editingWorkoutId, setEditingWorkoutId] = useState(null);
   const [editWorkoutSets, setEditWorkoutSets] = useState([{ reps: "", weight: "" }]);
+  const [editWorkoutDate, setEditWorkoutDate] = useState(() => toLocalDateStr(new Date()));
+
+  const [logDate, setLogDate] = useState(() => toLocalDateStr(new Date()));
 
   const [cardioForm, setCardioForm] = useState({
     activity: CARDIO_TYPES[0].id,
@@ -250,6 +253,7 @@ function Exerciser({ user, onUserChange }) {
     setError("");
     setEditingWorkoutId(item.id);
     setEditWorkoutSets(item.sets.map((s) => ({ reps: String(s.reps), weight: String(s.weight) })));
+    setEditWorkoutDate(item.date);
   };
 
   const cancelEditWorkout = () => {
@@ -265,6 +269,7 @@ function Exerciser({ user, onUserChange }) {
     try {
       const updated = await api.updateWorkout(workoutId, {
         sets: editWorkoutSets.map((row) => ({ reps: Number(row.reps), weight: Number(row.weight) })),
+        date: editWorkoutDate,
       });
       setWorkouts(workouts.map((w) => (w.id === workoutId ? updated : w)));
       if (lastSessions[updated.assigned_workout_id]?.id === workoutId) {
@@ -313,6 +318,7 @@ function Exerciser({ user, onUserChange }) {
     }
     setExpandedId(assigned.id);
     setLogSets([{ reps: "", weight: "" }]);
+    setLogDate(toLocalDateStr(new Date()));
     if (!(assigned.id in lastSessions)) {
       api
         .lastWorkoutFor(assigned.id)
@@ -332,6 +338,7 @@ function Exerciser({ user, onUserChange }) {
     try {
       const logged = await api.logAssignedWorkout(assigned.id, {
         sets: logSets.map((row) => ({ reps: Number(row.reps), weight: Number(row.weight) })),
+        date: logDate,
       });
       const [dash, w] = await Promise.all([api.dashboard(), api.listWorkouts()]);
       setDashboard(dash);
@@ -456,6 +463,16 @@ function Exerciser({ user, onUserChange }) {
 
         {editingWorkoutId === item.id ? (
           <form onSubmit={(e) => submitEditWorkout(e, item.id)}>
+            <div className="form-group">
+              <label className="form-label">Date</label>
+              <input
+                className="form-input"
+                type="date"
+                max={toLocalDateStr(new Date())}
+                value={editWorkoutDate}
+                onChange={(e) => setEditWorkoutDate(e.target.value)}
+              />
+            </div>
             {editWorkoutSets.map((row, idx) => (
               <div className="form-row" key={idx}>
                 <div className="form-group">
@@ -642,7 +659,7 @@ function Exerciser({ user, onUserChange }) {
                   <div className="row-between">
                     <div className="card-title">{assigned.exercise}</div>
                     <button className="btn btn-outline" type="button" onClick={() => toggleExpand(assigned)}>
-                      {expandedId === assigned.id ? "Close" : "Log Today"}
+                      {expandedId === assigned.id ? "Close" : "Log Workout"}
                     </button>
                   </div>
 
@@ -664,6 +681,17 @@ function Exerciser({ user, onUserChange }) {
                       {last === null && (
                         <div className="card-subtitle">No previous session yet.</div>
                       )}
+
+                      <div className="form-group">
+                        <label className="form-label">Date</label>
+                        <input
+                          className="form-input"
+                          type="date"
+                          max={toLocalDateStr(new Date())}
+                          value={logDate}
+                          onChange={(e) => setLogDate(e.target.value)}
+                        />
+                      </div>
 
                       {logSets.map((row, idx) => (
                         <div className="form-row" key={idx}>
