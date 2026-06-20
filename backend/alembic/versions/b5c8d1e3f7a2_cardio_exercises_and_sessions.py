@@ -37,6 +37,7 @@ SEED_EXERCISES = [
     ("🏋️", "Elliptical",       True),
     ("🤼", "Wrestling / MMA",  True),
     ("🧠", "Pilates",          False),
+    ("🎾", "Padel",            True),
     ("🏄", "Water Aerobics",   True),
 ]
 
