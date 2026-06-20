@@ -47,7 +47,7 @@ class TrainerSignup(BaseModel):
 
 class LoginRequest(BaseModel):
     role: Role
-    email: EmailStr
+    email: str
     password: str
 
 
