@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -62,7 +62,7 @@ def _get_client_assigned_workout_or_404(db: Session, client: User, assigned_id: 
 
 @router.get("/exercises", response_model=List[ExerciseOut])
 def list_exercises(
-    body_part: str | None = None,
+    body_part: Optional[str] = None,
     trainer: User = Depends(require_approved_trainer),
     db: Session = Depends(get_db),
 ):
