@@ -490,38 +490,84 @@ function Trainer() {
               </div>
             </div>
             {(() => {
+              const typed = assignForm.exercise.trim().toLowerCase();
               const suggestions = exerciseLibrary.filter(
                 (ex) => ex.body_part === assignForm.bodyPart
               );
-              return suggestions.length > 0 ? (
-                <div className="form-group">
-                  <label className="form-label">Previously used</label>
-                  <div className="chip-row" style={{ flexWrap: "wrap" }}>
-                    {suggestions.map((ex) => (
-                      <button
-                        key={ex.id}
-                        type="button"
-                        className={`chip ${assignForm.exercise === ex.name ? "active" : ""}`}
-                        onClick={() => setAssignForm({ ...assignForm, exercise: ex.name })}
-                      >
-                        {ex.name}
-                      </button>
-                    ))}
+              // Case-insensitive match anywhere in the library
+              const caseMatch = typed
+                ? exerciseLibrary.find((ex) => ex.name.toLowerCase() === typed)
+                : null;
+              // True duplicate: same name, different casing, not already selected exactly
+              const isDuplicate = caseMatch && caseMatch.name !== assignForm.exercise.trim();
+
+              return (
+                <>
+                  {suggestions.length > 0 && (
+                    <div className="form-group">
+                      <label className="form-label">Previously used</label>
+                      <div className="chip-row" style={{ flexWrap: "wrap" }}>
+                        {suggestions.map((ex) => (
+                          <button
+                            key={ex.id}
+                            type="button"
+                            className={`chip ${
+                              assignForm.exercise === ex.name
+                                ? "active"
+                                : caseMatch && caseMatch.id === ex.id
+                                ? "active"
+                                : ""
+                            }`}
+                            style={
+                              caseMatch && caseMatch.id === ex.id && assignForm.exercise !== ex.name
+                                ? { outline: "2px solid var(--color-warning)", outlineOffset: "2px" }
+                                : {}
+                            }
+                            onClick={() => setAssignForm({ ...assignForm, exercise: ex.name })}
+                          >
+                            {ex.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="form-group">
+                    <label className="form-label">Exercise name</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      placeholder="e.g. Incline bench press"
+                      value={assignForm.exercise}
+                      style={isDuplicate ? { borderColor: "var(--color-warning)" } : {}}
+                      onChange={(e) => setAssignForm({ ...assignForm, exercise: e.target.value })}
+                    />
+                    {isDuplicate && (
+                      <div style={{
+                        marginTop: 6,
+                        padding: "8px 12px",
+                        background: "var(--color-warning-bg)",
+                        color: "var(--color-warning)",
+                        borderRadius: "var(--radius-sm)",
+                        fontSize: 13,
+                        fontWeight: 500,
+                      }}>
+                        ⚠️ "{caseMatch.name}" already exists in your library. Please select it from the list above.
+                      </div>
+                    )}
                   </div>
-                </div>
-              ) : null;
+
+                  <button
+                    className="btn btn-success"
+                    type="submit"
+                    disabled={isDuplicate}
+                    style={isDuplicate ? { opacity: 0.4, cursor: "not-allowed" } : {}}
+                  >
+                    Assign
+                  </button>
+                </>
+              );
             })()}
-            <div className="form-group">
-              <label className="form-label">Exercise name</label>
-              <input
-                className="form-input"
-                type="text"
-                placeholder="e.g. Incline bench press"
-                value={assignForm.exercise}
-                onChange={(e) => setAssignForm({ ...assignForm, exercise: e.target.value })}
-              />
-            </div>
-            <button className="btn btn-success" type="submit">Assign</button>
           </motion.form>
         )}
 

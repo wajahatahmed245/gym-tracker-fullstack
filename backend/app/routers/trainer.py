@@ -30,16 +30,21 @@ from ..schemas import (
 router = APIRouter(prefix="/api/trainer", tags=["trainer"])
 
 
-def _upsert_exercise_library(db: Session, trainer_id: int, body_part, name: str) -> None:
-    """Insert exercise into trainer's library, or update body_part if the name already exists."""
+def _upsert_exercise_library(db: Session, trainer_id: int, body_part, name: str) -> str:
+    """Insert exercise into trainer's library, or update body_part if it changed.
+    Returns the canonical name (the first-saved casing) so callers always store consistently."""
     normalized = name.strip().lower()
     existing = db.execute(
         select(Exercise).where(Exercise.trainer_id == trainer_id, Exercise.name_normalized == normalized)
     ).scalars().first()
     if existing is None:
-        db.add(Exercise(trainer_id=trainer_id, body_part=body_part, name=name.strip(), name_normalized=normalized))
-    elif existing.body_part != body_part:
+        entry = Exercise(trainer_id=trainer_id, body_part=body_part, name=name.strip(), name_normalized=normalized)
+        db.add(entry)
+        db.flush()
+        return entry.name
+    if existing.body_part != body_part:
         existing.body_part = body_part
+    return existing.name
 
 
 def _get_client_or_404(db: Session, trainer: User, exerciser_id: int) -> User:
@@ -204,11 +209,11 @@ def assign_workout(
             detail=f"{client.name} has marked today as unavailable",
         )
 
-    # Save / update in trainer's exercise library
-    _upsert_exercise_library(db, trainer.id, payload.body_part, payload.exercise)
+    # Save / update in trainer's exercise library; get back the canonical casing
+    canonical_name = _upsert_exercise_library(db, trainer.id, payload.body_part, payload.exercise)
 
     # Reuse existing AssignedWorkout for the same exerciser + exercise (case-insensitive)
-    name_normalized = payload.exercise.strip().lower()
+    name_normalized = canonical_name.strip().lower()
     existing = db.execute(
         select(AssignedWorkout).where(
             AssignedWorkout.exerciser_id == client.id,
@@ -237,7 +242,7 @@ def assign_workout(
         exerciser_id=client.id,
         trainer_id=trainer.id,
         body_part=payload.body_part,
-        exercise=payload.exercise.strip(),
+        exercise=canonical_name,
     )
     db.add(assigned)
     db.commit()
