@@ -801,6 +801,21 @@ body {
   background: #ffffff;
 }
 
+.calendar-day.has-cardio::before {
+  content: "";
+  position: absolute;
+  bottom: 5px;
+  left: calc(50% + 5px);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-warning, #f59e0b);
+}
+
+.calendar-day.selected.has-cardio::before {
+  background: #ffffff;
+}
+
 .calendar-day.unavailable {
   border-color: var(--color-danger);
   color: var(--color-danger);

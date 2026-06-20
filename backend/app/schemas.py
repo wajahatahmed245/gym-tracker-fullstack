@@ -175,6 +175,42 @@ class CardioOut(BaseModel):
     date: date_type
 
 
+# ---------- New cardio system ----------
+
+class CardioExerciseCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    icon: str = Field(min_length=1, max_length=10, default="🏃")
+    tracks_calories: bool = True
+
+
+class CardioExerciseOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    icon: str
+    tracks_calories: bool
+
+
+class CardioSessionCreate(BaseModel):
+    cardio_exercise_id: int
+    duration_minutes: int = Field(gt=0)
+    calories_burned: Optional[int] = Field(default=None, gt=0)
+    date: Optional[date_type] = None
+
+
+class CardioSessionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    cardio_exercise_id: Optional[int]
+    exercise_name: str
+    exercise_icon: str
+    duration_minutes: int
+    calories_burned: Optional[int]
+    date: date_type
+
+
 class AssignedWorkoutOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

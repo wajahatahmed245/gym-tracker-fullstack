@@ -72,8 +72,10 @@ export const api = {
   dashboard: () => request("/exerciser/dashboard"),
   updateProfile: (payload) => request("/exerciser/profile", { method: "PATCH", body: payload }),
   listWorkouts: () => request("/exerciser/workouts"),
-  listCardio: () => request("/exerciser/cardio"),
-  logCardio: (payload) => request("/exerciser/cardio", { method: "POST", body: payload }),
+  exerciserCardioExercises: () => request("/exerciser/cardio-exercises"),
+  listCardioSessions: () => request("/exerciser/cardio-sessions"),
+  logCardioSession: (payload) => request("/exerciser/cardio-sessions", { method: "POST", body: payload }),
+  deleteCardioSession: (id) => request(`/exerciser/cardio-sessions/${id}`, { method: "DELETE" }),
   assignedWorkouts: () => request("/exerciser/assigned-workouts"),
   logAssignedWorkout: (assignedId, payload) =>
     request(`/exerciser/assigned-workouts/${assignedId}/log`, { method: "POST", body: payload }),
@@ -95,6 +97,9 @@ export const api = {
   // ---- trainer ----
   trainerExercises: (bodyPart) =>
     request(`/trainer/exercises${bodyPart ? `?body_part=${bodyPart}` : ""}`),
+  trainerCardioExercises: () => request("/trainer/cardio-exercises"),
+  createCardioExercise: (payload) => request("/trainer/cardio-exercises", { method: "POST", body: payload }),
+  deleteCardioExercise: (id) => request(`/trainer/cardio-exercises/${id}`, { method: "DELETE" }),
   clients: () => request("/trainer/clients"),
   clientsUnavailability: () => request("/trainer/clients/unavailability"),
   clientDetail: (id) => request(`/trainer/clients/${id}`),

@@ -222,6 +222,7 @@ class AssignedWorkout(Base):
 
 
 class CardioLog(Base):
+    """Legacy table — kept for migration safety, no longer used by the app."""
     __tablename__ = "cardio_logs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -230,6 +231,42 @@ class CardioLog(Base):
     duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class CardioExercise(Base):
+    """Trainer's cardio exercise library — seeded + trainer-managed."""
+    __tablename__ = "cardio_exercises"
+    __table_args__ = (UniqueConstraint("trainer_id", "name", name="uq_cardio_exercise_trainer_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trainer_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    icon: Mapped[str] = mapped_column(String(10), nullable=False, default="🏃")
+    tracks_calories: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    sessions: Mapped[List["CardioSession"]] = relationship(
+        "CardioSession", back_populates="cardio_exercise"
+    )
+
+
+class CardioSession(Base):
+    """Exerciser's cardio log entry."""
+    __tablename__ = "cardio_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    exerciser_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    cardio_exercise_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("cardio_exercises.id"), nullable=True, index=True
+    )
+    duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    calories_burned: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    cardio_exercise: Mapped[Optional["CardioExercise"]] = relationship(
+        "CardioExercise", back_populates="sessions"
+    )
 
 
 class TrainerNote(Base):

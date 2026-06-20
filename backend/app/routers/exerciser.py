@@ -15,7 +15,6 @@ from ..models import (
     AccountStatus,
     ApprovalStatus,
     AssignedWorkout,
-    CardioLog,
     NoteAuthor,
     Role,
     TrainerNote,
@@ -27,8 +26,6 @@ from ..models import (
 )
 from ..schemas import (
     AssignedWorkoutOut,
-    CardioCreate,
-    CardioOut,
     DashboardOut,
     ExerciserProfileOut,
     ExerciserProfileUpdate,
@@ -210,30 +207,6 @@ def last_log_for_assigned_workout(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No previous session for this exercise")
 
     return _workout_out(workout)
-
-
-@router.get("/exerciser/cardio", response_model=List[CardioOut])
-def list_cardio(user: User = Depends(require_exerciser), db: Session = Depends(get_db)):
-    return crud.cardio_logs_for(db, exerciser_id=user.id)
-
-
-@router.post("/exerciser/cardio", response_model=CardioOut, status_code=status.HTTP_201_CREATED)
-def log_cardio(payload: CardioCreate, user: User = Depends(require_exerciser), db: Session = Depends(get_db)):
-    cardio = CardioLog(
-        exerciser_id=user.id,
-        activity=payload.activity,
-        duration_minutes=payload.duration_minutes,
-        date=payload.date or date.today(),
-    )
-    db.add(cardio)
-    db.commit()
-    db.refresh(cardio)
-
-    logger.info(
-        "Cardio logged: exerciser_id=%s activity=%s duration=%s",
-        user.id, cardio.activity.value, cardio.duration_minutes,
-    )
-    return cardio
 
 
 @router.get("/trainers", response_model=List[TrainerListItem])

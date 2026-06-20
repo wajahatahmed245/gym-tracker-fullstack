@@ -10,15 +10,6 @@ import { screenTransition, cardTransition, tabContent, tapScale, popIn } from ".
 import AvailabilityCalendar from "./AvailabilityCalendar";
 import UnavailabilityTicker from "./UnavailabilityTicker";
 
-const CARDIO_TYPES = [
-  { id: "Running", icon: "🏃" },
-  { id: "Cycling", icon: "🚴" },
-  { id: "Swimming", icon: "🏊" },
-  { id: "Rowing", icon: "🚣" },
-  { id: "Walking", icon: "🚶" },
-  { id: "Elliptical", icon: "🏃‍♀️" },
-];
-
 function HealthCard({ health, currentWeight }) {
   const { healthy_weight_min_kg: min, healthy_weight_max_kg: max } = health;
 
@@ -81,8 +72,10 @@ function Exerciser({ user, onUserChange }) {
 
   const [dashboard, setDashboard] = useState({ workouts_this_week: 0, days_since_last_workout: null });
   const [workouts, setWorkouts] = useState([]);
-  const [cardioLogs, setCardioLogs] = useState([]);
   const [assignedWorkouts, setAssignedWorkouts] = useState([]);
+  const [cardioExercises, setCardioExercises] = useState([]);
+  const [cardioSessions, setCardioSessions] = useState([]);
+  const [cardioForm, setCardioForm] = useState({ exerciseId: null, duration: "", calories: "", date: "" });
   const [trainers, setTrainers] = useState([]);
   const [trainerError, setTrainerError] = useState("");
 
@@ -98,11 +91,6 @@ function Exerciser({ user, onUserChange }) {
   const [editWorkoutDate, setEditWorkoutDate] = useState(() => toLocalDateStr(new Date()));
 
   const [logDate, setLogDate] = useState(() => toLocalDateStr(new Date()));
-
-  const [cardioForm, setCardioForm] = useState({
-    activity: CARDIO_TYPES[0].id,
-    duration: "",
-  });
 
   const [profileForm, setProfileForm] = useState(null);
   const [profileSaving, setProfileSaving] = useState(false);
@@ -139,17 +127,20 @@ function Exerciser({ user, onUserChange }) {
     Promise.all([
       api.dashboard(),
       api.listWorkouts(),
-      api.listCardio(),
       api.assignedWorkouts(),
       api.listTrainers(),
+      api.exerciserCardioExercises(),
+      api.listCardioSessions(),
     ])
-      .then(([dash, w, c, aw, t]) => {
+      .then(([dash, w, aw, t, ce, cs]) => {
         if (cancelled) return;
         setDashboard(dash);
         setWorkouts(w);
-        setCardioLogs(c);
         setAssignedWorkouts(aw);
         setTrainers(t);
+        setCardioExercises(ce);
+        setCardioSessions(cs);
+        setCardioForm((f) => ({ ...f, date: toLocalDateStr(new Date()) }));
       })
       .catch((err) => {
         if (!cancelled) setError(err.message || "Failed to load data.");
@@ -179,6 +170,18 @@ function Exerciser({ user, onUserChange }) {
       cancelled = true;
       clearInterval(interval);
     };
+  }, [screen]);
+
+  useEffect(() => {
+    if (screen !== "cardio") return;
+    let cancelled = false;
+    const refresh = () => {
+      api.exerciserCardioExercises().then((ce) => { if (!cancelled) setCardioExercises(ce); }).catch(() => {});
+      api.listCardioSessions().then((cs) => { if (!cancelled) setCardioSessions(cs); }).catch(() => {});
+    };
+    refresh();
+    const interval = setInterval(refresh, 8000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, [screen]);
 
   useEffect(() => {
@@ -219,10 +222,6 @@ function Exerciser({ user, onUserChange }) {
     setLeaveNote("");
     setEditingWorkoutId(null);
     setScreen("home");
-  };
-
-  const handleCardioChange = (field, value) => {
-    setCardioForm({ ...cardioForm, [field]: value });
   };
 
   const updateSetRow = (index, field, value) => {
@@ -354,20 +353,36 @@ function Exerciser({ user, onUserChange }) {
 
   const submitCardio = async (e) => {
     e.preventDefault();
-    if (!cardioForm.duration) {
-      return;
-    }
+    if (!cardioForm.exerciseId || !cardioForm.duration) return;
     setError("");
+    const selectedEx = cardioExercises.find((ex) => ex.id === cardioForm.exerciseId);
     try {
-      await api.logCardio({
-        activity: cardioForm.activity,
+      const payload = {
+        cardio_exercise_id: cardioForm.exerciseId,
         duration_minutes: Number(cardioForm.duration),
-      });
-      setCardioLogs(await api.listCardio());
-      setSavedMessage("Cardio logged successfully!");
-      setCardioForm({ activity: cardioForm.activity, duration: "" });
+        date: cardioForm.date || toLocalDateStr(new Date()),
+      };
+      if (selectedEx?.tracks_calories && cardioForm.calories) {
+        payload.calories_burned = Number(cardioForm.calories);
+      }
+      const newSession = await api.logCardioSession(payload);
+      setCardioSessions((prev) => [newSession, ...prev]);
+      setWorkouts(await api.listWorkouts());
+      setSavedMessage("Cardio logged!");
+      setCardioForm((f) => ({ exerciseId: f.exerciseId, duration: "", calories: "", date: toLocalDateStr(new Date()) }));
     } catch (err) {
       setError(err.message || "Failed to log cardio.");
+    }
+  };
+
+  const deleteCardioSession = async (sessionId) => {
+    if (!window.confirm("Delete this cardio session?")) return;
+    setError("");
+    try {
+      await api.deleteCardioSession(sessionId);
+      setCardioSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    } catch (err) {
+      setError(err.message || "Failed to delete session.");
     }
   };
 
@@ -431,6 +446,7 @@ function Exerciser({ user, onUserChange }) {
   }, {});
 
   const workoutDates = new Set(workouts.map((w) => w.date));
+  const cardioSessionDates = new Set(cardioSessions.map((s) => s.date));
 
   const exerciseOptionsByBodyPart = workouts.reduce((groups, w) => {
     if (!groups[w.body_part]) groups[w.body_part] = [];
@@ -599,8 +615,8 @@ function Exerciser({ user, onUserChange }) {
             <motion.button className="btn btn-primary" whileTap={tapScale} onClick={() => setScreen("my-exercises")}>
               💪 My Exercises
             </motion.button>
-            <motion.button className="btn btn-outline" whileTap={tapScale} onClick={() => setScreen("log-cardio")}>
-              🏃 Log Cardio
+            <motion.button className="btn btn-outline" whileTap={tapScale} onClick={() => setScreen("cardio")}>
+              🏃 Cardio
             </motion.button>
             <motion.button className="btn" whileTap={tapScale} onClick={() => setScreen("history")}>
               📜 View History
@@ -813,6 +829,7 @@ function Exerciser({ user, onUserChange }) {
                 const dayNum = Number(dateStr.slice(-2));
                 const classes = ["calendar-day"];
                 if (workoutDates.has(dateStr)) classes.push("has-workout");
+                if (cardioSessionDates.has(dateStr)) classes.push("has-cardio");
                 if (dateStr === selectedDate) classes.push("selected");
                 if (dateStr === toLocalDateStr(new Date())) classes.push("today");
                 return (
@@ -832,10 +849,18 @@ function Exerciser({ user, onUserChange }) {
             <AnimatePresence mode="wait">
               <motion.div className="section" key={selectedDate} {...tabContent}>
                 <div className="date-heading">{formatDateLabel(selectedDate)}</div>
-                {(groupedHistory[selectedDate] || []).length === 0 ? (
-                  <div className="card-subtitle">No workouts logged on this date.</div>
-                ) : (
-                  groupedHistory[selectedDate].map((item, idx) => renderWorkoutCard(item, { index: idx }))
+                {(groupedHistory[selectedDate] || []).map((item, idx) => renderWorkoutCard(item, { index: idx }))}
+                {cardioSessions.filter((s) => s.date === selectedDate).map((s, idx) => (
+                  <motion.div className="card" key={`cs-${s.id}`} {...cardTransition(idx)}>
+                    <div className="row-between">
+                      <div className="card-title">{s.exercise_icon} {s.exercise_name}</div>
+                      <span className="tag tag-cardio">🏃 Cardio</span>
+                    </div>
+                    <div className="card-subtitle">{s.duration_minutes} min{s.calories_burned ? ` · ${s.calories_burned} kcal` : ""}</div>
+                  </motion.div>
+                ))}
+                {(groupedHistory[selectedDate] || []).length === 0 && cardioSessions.filter((s) => s.date === selectedDate).length === 0 && (
+                  <div className="card-subtitle">No activity logged on this date.</div>
                 )}
               </motion.div>
             </AnimatePresence>
@@ -909,12 +934,15 @@ function Exerciser({ user, onUserChange }) {
     );
   }
 
-  if (screen === "log-cardio") {
+  if (screen === "cardio") {
+    const selectedEx = cardioExercises.find((ex) => ex.id === cardioForm.exerciseId);
+    const canSubmit = cardioForm.exerciseId && cardioForm.duration;
+
     return (
       <motion.div {...screenTransition}>
         <div className="screen-header">
           <button className="back-button" onClick={goHome}>←</button>
-          <span className="screen-title">Log Cardio</span>
+          <span className="screen-title">Cardio</span>
         </div>
 
         {error && (
@@ -922,61 +950,94 @@ function Exerciser({ user, onUserChange }) {
             {error}
           </motion.div>
         )}
-
-        <form onSubmit={submitCardio}>
-          <div className="form-group">
-            <label className="form-label">Activity Type</label>
-            <div className="chip-row">
-              {CARDIO_TYPES.map((type) => (
-                <button
-                  key={type.id}
-                  type="button"
-                  className={`chip ${cardioForm.activity === type.id ? "active" : ""}`}
-                  onClick={() => handleCardioChange("activity", type.id)}
-                >
-                  <span className="chip-icon">{type.icon}</span>
-                  <span>{type.id}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Duration (minutes)</label>
-            <input
-              className="form-input"
-              type="number"
-              min="1"
-              placeholder="30"
-              value={cardioForm.duration}
-              onChange={(e) => handleCardioChange("duration", e.target.value)}
-            />
-          </div>
-
-          <button className="btn btn-primary" type="submit">Save Cardio</button>
-        </form>
-
-        {savedMessage && screen === "log-cardio" && (
+        {savedMessage && (
           <motion.div className="success-box" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
             {savedMessage}
           </motion.div>
         )}
 
-        {cardioLogs.length > 0 && (
+        {cardioExercises.length === 0 ? (
+          <div className="info-box">Your trainer hasn't added any cardio exercises yet.</div>
+        ) : (
+          <form onSubmit={submitCardio}>
+            <div className="form-group">
+              <label className="form-label">Exercise</label>
+              <div className="chip-row" style={{ flexWrap: "wrap" }}>
+                {cardioExercises.map((ex) => (
+                  <button
+                    key={ex.id}
+                    type="button"
+                    className={`chip ${cardioForm.exerciseId === ex.id ? "active" : ""}`}
+                    onClick={() => setCardioForm((f) => ({ ...f, exerciseId: ex.id, calories: "" }))}
+                  >
+                    <span className="chip-icon">{ex.icon}</span>
+                    <span>{ex.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Duration (minutes)</label>
+                <input
+                  className="form-input"
+                  type="number"
+                  min="1"
+                  placeholder="30"
+                  value={cardioForm.duration}
+                  onChange={(e) => setCardioForm((f) => ({ ...f, duration: e.target.value }))}
+                />
+              </div>
+              {selectedEx?.tracks_calories && (
+                <div className="form-group">
+                  <label className="form-label">Calories burned (optional)</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="1"
+                    placeholder="250"
+                    value={cardioForm.calories}
+                    onChange={(e) => setCardioForm((f) => ({ ...f, calories: e.target.value }))}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Date</label>
+              <input
+                className="form-input"
+                type="date"
+                max={toLocalDateStr(new Date())}
+                value={cardioForm.date}
+                onChange={(e) => setCardioForm((f) => ({ ...f, date: e.target.value }))}
+              />
+            </div>
+
+            <button className="btn btn-primary" type="submit" disabled={!canSubmit}>
+              Log Cardio
+            </button>
+          </form>
+        )}
+
+        {cardioSessions.length > 0 && (
           <div className="section">
             <div className="section-title">Cardio History</div>
-            {cardioLogs.map((log, idx) => {
-              const icon = CARDIO_TYPES.find((t) => t.id === log.activity)?.icon;
-              return (
-                <motion.div className="card" key={log.id} {...cardTransition(idx)}>
-                  <div className="row-between">
-                    <div className="card-title">{log.activity}</div>
-                    <span className="tag tag-cardio">{icon} Cardio</span>
-                  </div>
-                  <div className="card-subtitle">{formatDateLabel(log.date)} — {log.duration_minutes} minutes</div>
-                </motion.div>
-              );
-            })}
+            {cardioSessions.map((s, idx) => (
+              <motion.div className="card" key={s.id} {...cardTransition(idx)}>
+                <div className="row-between">
+                  <div className="card-title">{s.exercise_icon} {s.exercise_name}</div>
+                  <button className="btn btn-outline" type="button" onClick={() => deleteCardioSession(s.id)}>
+                    Delete
+                  </button>
+                </div>
+                <div className="card-subtitle">
+                  {formatDateLabel(s.date)} · {s.duration_minutes} min
+                  {s.calories_burned ? ` · ${s.calories_burned} kcal` : ""}
+                </div>
+              </motion.div>
+            ))}
           </div>
         )}
       </motion.div>

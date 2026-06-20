@@ -29,6 +29,10 @@ function Trainer() {
   const [editForm, setEditForm] = useState({ bodyPart: BODY_PARTS[0].id, exercise: "" });
 
   const [exerciseLibrary, setExerciseLibrary] = useState([]);
+  const [cardioLibrary, setCardioLibrary] = useState([]);
+  const [cardioFormOpen, setCardioFormOpen] = useState(false);
+  const [newCardioExercise, setNewCardioExercise] = useState({ name: "", icon: "🏃", tracks_calories: true });
+  const [cardioError, setCardioError] = useState("");
 
   const [notes, setNotes] = useState([]);
   const [showRemoveClient, setShowRemoveClient] = useState(false);
@@ -580,6 +584,127 @@ function Trainer() {
     );
   }
 
+  if (screen === "cardio-library") {
+    const submitNewCardio = async (e) => {
+      e.preventDefault();
+      if (!newCardioExercise.name.trim()) return;
+      setCardioError("");
+      try {
+        const created = await api.createCardioExercise({
+          name: newCardioExercise.name.trim(),
+          icon: newCardioExercise.icon || "🏃",
+          tracks_calories: newCardioExercise.tracks_calories,
+        });
+        setCardioLibrary((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+        setNewCardioExercise({ name: "", icon: "🏃", tracks_calories: true });
+        setCardioFormOpen(false);
+      } catch (err) {
+        setCardioError(err.message || "Failed to add exercise.");
+      }
+    };
+
+    const deleteCardio = async (id) => {
+      if (!window.confirm("Delete this exercise?")) return;
+      setCardioError("");
+      try {
+        await api.deleteCardioExercise(id);
+        setCardioLibrary((prev) => prev.filter((ex) => ex.id !== id));
+      } catch (err) {
+        setCardioError(err.message || "Cannot delete — clients may have sessions logged for this exercise.");
+      }
+    };
+
+    return (
+      <motion.div {...screenTransition}>
+        <div className="screen-header">
+          <button className="back-button" onClick={() => { setScreen("clients"); setCardioError(""); setCardioFormOpen(false); }}>←</button>
+          <span className="screen-title">Cardio Exercise Library</span>
+        </div>
+
+        {cardioError && (
+          <motion.div className="auth-error" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+            {cardioError}
+          </motion.div>
+        )}
+
+        {cardioLibrary.length === 0 && !cardioFormOpen && (
+          <div className="info-box">No cardio exercises yet. Add some below so your clients can log their sessions.</div>
+        )}
+
+        {cardioLibrary.map((ex, idx) => (
+          <motion.div className="card" key={ex.id} {...cardTransition(idx)}>
+            <div className="row-between">
+              <div className="card-title">{ex.icon} {ex.name}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {ex.tracks_calories && <span className="tag tag-goal">🔥 Calories</span>}
+                <button className="btn btn-outline" type="button" onClick={() => deleteCardio(ex.id)}>Remove</button>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+
+        <div className="section">
+          <motion.button className="btn btn-primary" whileTap={tapScale} onClick={() => setCardioFormOpen((v) => !v)}>
+            {cardioFormOpen ? "Cancel" : "➕ Add Exercise"}
+          </motion.button>
+        </div>
+
+        {cardioFormOpen && (
+          <motion.form
+            onSubmit={submitNewCardio}
+            className="section"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            style={{ overflow: "hidden" }}
+          >
+            <div className="form-group">
+              <label className="form-label">Exercise name</label>
+              <input
+                className="form-input"
+                type="text"
+                placeholder="e.g. Treadmill Sprint"
+                value={newCardioExercise.name}
+                onChange={(e) => setNewCardioExercise((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Icon (emoji)</label>
+              <input
+                className="form-input"
+                type="text"
+                placeholder="🏃"
+                maxLength={10}
+                value={newCardioExercise.icon}
+                onChange={(e) => setNewCardioExercise((f) => ({ ...f, icon: e.target.value }))}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Track calories</label>
+              <div className="chip-row">
+                <button
+                  type="button"
+                  className={`chip ${newCardioExercise.tracks_calories ? "active" : ""}`}
+                  onClick={() => setNewCardioExercise((f) => ({ ...f, tracks_calories: true }))}
+                >
+                  🔥 Yes — show calories field
+                </button>
+                <button
+                  type="button"
+                  className={`chip ${!newCardioExercise.tracks_calories ? "active" : ""}`}
+                  onClick={() => setNewCardioExercise((f) => ({ ...f, tracks_calories: false }))}
+                >
+                  ⏱ No — duration only
+                </button>
+              </div>
+            </div>
+            <button className="btn btn-success" type="submit">Add to Library</button>
+          </motion.form>
+        )}
+      </motion.div>
+    );
+  }
+
   if (screen === "availability") {
     return (
       <motion.div {...screenTransition}>
@@ -617,9 +742,15 @@ function Trainer() {
         </div>
       </div>
 
-      <div className="section">
+      <div className="section" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
         <motion.button className="btn btn-outline" whileTap={tapScale} onClick={() => setScreen("availability")}>
           🗓️ My Availability
+        </motion.button>
+        <motion.button className="btn btn-outline" whileTap={tapScale} onClick={() => {
+          api.trainerCardioExercises().then(setCardioLibrary).catch(() => {});
+          setScreen("cardio-library");
+        }}>
+          🏃 Cardio Library
         </motion.button>
       </div>
 
