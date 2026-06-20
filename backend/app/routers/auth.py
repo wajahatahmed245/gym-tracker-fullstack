@@ -100,7 +100,7 @@ def signup_trainer(payload: TrainerSignup, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    user = _get_user_by_email(db, payload.email)
+    user = _get_user_by_email(db, payload.email.strip().lower())
 
     if user is None or user.role != payload.role or not verify_password(payload.password, user.hashed_password):
         logger.warning("Failed login attempt for email=%s role=%s", payload.email, payload.role.value)
