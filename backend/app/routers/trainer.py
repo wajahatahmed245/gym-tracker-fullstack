@@ -12,7 +12,7 @@ from .. import health as health_calc
 from ..database import get_db
 from ..deps import require_approved_trainer
 from ..logging_config import logger
-from ..models import AssignedWorkout, ExerciserProfile, NoteAuthor, TrainerNote, Unavailability, User, Workout
+from ..models import AssignedWorkout, Exercise, ExerciserProfile, NoteAuthor, TrainerNote, Unavailability, User, Workout
 from ..schemas import (
     AssignWorkoutCreate,
     AssignedWorkoutOut,
@@ -20,6 +20,7 @@ from ..schemas import (
     ClientDetailOut,
     ClientOut,
     ClientUnavailabilityOut,
+    ExerciseOut,
     LeaveNoteIn,
     RecentWorkoutItem,
     TrainerNoteOut,
@@ -27,6 +28,18 @@ from ..schemas import (
 )
 
 router = APIRouter(prefix="/api/trainer", tags=["trainer"])
+
+
+def _upsert_exercise_library(db: Session, trainer_id: int, body_part, name: str) -> None:
+    """Insert exercise into trainer's library, or update body_part if the name already exists."""
+    normalized = name.strip().lower()
+    existing = db.execute(
+        select(Exercise).where(Exercise.trainer_id == trainer_id, Exercise.name_normalized == normalized)
+    ).scalars().first()
+    if existing is None:
+        db.add(Exercise(trainer_id=trainer_id, body_part=body_part, name=name.strip(), name_normalized=normalized))
+    elif existing.body_part != body_part:
+        existing.body_part = body_part
 
 
 def _get_client_or_404(db: Session, trainer: User, exerciser_id: int) -> User:
@@ -45,6 +58,19 @@ def _get_client_assigned_workout_or_404(db: Session, client: User, assigned_id: 
     if assigned is None or assigned.exerciser_id != client.id or not assigned.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assigned exercise not found")
     return assigned
+
+
+@router.get("/exercises", response_model=List[ExerciseOut])
+def list_exercises(
+    body_part: str | None = None,
+    trainer: User = Depends(require_approved_trainer),
+    db: Session = Depends(get_db),
+):
+    """Return the trainer's personal exercise library, optionally filtered by body_part."""
+    q = select(Exercise).where(Exercise.trainer_id == trainer.id).order_by(Exercise.name)
+    if body_part:
+        q = q.where(Exercise.body_part == body_part)
+    return db.execute(q).scalars().all()
 
 
 @router.get("/clients", response_model=List[ClientOut])
@@ -178,11 +204,40 @@ def assign_workout(
             detail=f"{client.name} has marked today as unavailable",
         )
 
+    # Save / update in trainer's exercise library
+    _upsert_exercise_library(db, trainer.id, payload.body_part, payload.exercise)
+
+    # Reuse existing AssignedWorkout for the same exerciser + exercise (case-insensitive)
+    name_normalized = payload.exercise.strip().lower()
+    existing = db.execute(
+        select(AssignedWorkout).where(
+            AssignedWorkout.exerciser_id == client.id,
+            AssignedWorkout.trainer_id == trainer.id,
+        )
+    ).scalars().all()
+    match = next(
+        (a for a in existing if a.exercise.strip().lower() == name_normalized),
+        None,
+    )
+
+    if match is not None:
+        if not match.active:
+            match.active = True
+            match.body_part = payload.body_part
+            db.commit()
+            db.refresh(match)
+            logger.info(
+                "Trainer id=%s reactivated assigned workout id=%s for exerciser_id=%s",
+                trainer.id, match.id, client.id,
+            )
+        db.commit()
+        return match
+
     assigned = AssignedWorkout(
         exerciser_id=client.id,
         trainer_id=trainer.id,
         body_part=payload.body_part,
-        exercise=payload.exercise,
+        exercise=payload.exercise.strip(),
     )
     db.add(assigned)
     db.commit()

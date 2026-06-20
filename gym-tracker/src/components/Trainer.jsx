@@ -28,6 +28,8 @@ function Trainer() {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ bodyPart: BODY_PARTS[0].id, exercise: "" });
 
+  const [exerciseLibrary, setExerciseLibrary] = useState([]);
+
   const [notes, setNotes] = useState([]);
   const [showRemoveClient, setShowRemoveClient] = useState(false);
   const [removeNote, setRemoveNote] = useState("");
@@ -184,8 +186,13 @@ function Trainer() {
         body_part: assignForm.bodyPart,
         exercise: assignForm.exercise,
       });
-      setClientDetail(await api.clientDetail(selectedId));
-      setAssignedMessage(`New workout assigned to ${clientDetail?.name}!`);
+      const [detail, library] = await Promise.all([
+        api.clientDetail(selectedId),
+        api.trainerExercises(),
+      ]);
+      setClientDetail(detail);
+      setExerciseLibrary(library);
+      setAssignedMessage(`Exercise assigned to ${clientDetail?.name}!`);
       setAssignForm({ bodyPart: BODY_PARTS[0].id, exercise: "" });
       setShowAssign(false);
     } catch (err) {
@@ -446,7 +453,12 @@ function Trainer() {
 
         {!clientDetail.unavailable_dates.includes(toLocalDateStr(new Date())) && (
           <div className="section">
-            <motion.button className="btn btn-primary" whileTap={tapScale} onClick={() => setShowAssign(!showAssign)}>
+            <motion.button className="btn btn-primary" whileTap={tapScale} onClick={() => {
+              if (!showAssign) {
+                api.trainerExercises().then(setExerciseLibrary).catch(() => {});
+              }
+              setShowAssign(!showAssign);
+            }}>
               ➕ Assign New Exercise
             </motion.button>
           </div>
@@ -477,8 +489,30 @@ function Trainer() {
                 ))}
               </div>
             </div>
+            {(() => {
+              const suggestions = exerciseLibrary.filter(
+                (ex) => ex.body_part === assignForm.bodyPart
+              );
+              return suggestions.length > 0 ? (
+                <div className="form-group">
+                  <label className="form-label">Previously used</label>
+                  <div className="chip-row" style={{ flexWrap: "wrap" }}>
+                    {suggestions.map((ex) => (
+                      <button
+                        key={ex.id}
+                        type="button"
+                        className={`chip ${assignForm.exercise === ex.name ? "active" : ""}`}
+                        onClick={() => setAssignForm({ ...assignForm, exercise: ex.name })}
+                      >
+                        {ex.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null;
+            })()}
             <div className="form-group">
-              <label className="form-label">Exercise</label>
+              <label className="form-label">Exercise name</label>
               <input
                 className="form-input"
                 type="text"

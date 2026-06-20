@@ -268,6 +268,14 @@ class ClientDetailOut(BaseModel):
     recent_workouts: List[RecentWorkoutItem]
 
 
+class ExerciseOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    body_part: BodyPart
+    name: str
+
+
 class AssignWorkoutCreate(BaseModel):
     body_part: BodyPart
     exercise: str = Field(min_length=1, max_length=120)

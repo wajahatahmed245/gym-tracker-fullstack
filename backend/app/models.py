@@ -188,6 +188,19 @@ class WorkoutSet(Base):
     workout: Mapped["Workout"] = relationship("Workout", back_populates="sets")
 
 
+class Exercise(Base):
+    """Trainer's personal exercise library — one row per unique exercise name per trainer."""
+    __tablename__ = "exercises"
+    __table_args__ = (UniqueConstraint("trainer_id", "name_normalized", name="uq_exercise_trainer_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trainer_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    body_part: Mapped[BodyPart] = mapped_column(Enum(BodyPart), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    name_normalized: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class AssignedWorkout(Base):
     __tablename__ = "assigned_workouts"
 

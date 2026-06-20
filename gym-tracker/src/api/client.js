@@ -93,6 +93,8 @@ export const api = {
   removeUnavailableDate: (date) => request(`/me/unavailability/${date}`, { method: "DELETE" }),
 
   // ---- trainer ----
+  trainerExercises: (bodyPart) =>
+    request(`/trainer/exercises${bodyPart ? `?body_part=${bodyPart}` : ""}`),
   clients: () => request("/trainer/clients"),
   clientsUnavailability: () => request("/trainer/clients/unavailability"),
   clientDetail: (id) => request(`/trainer/clients/${id}`),
