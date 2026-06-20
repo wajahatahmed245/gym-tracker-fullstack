@@ -173,6 +173,17 @@ function Exerciser({ user, onUserChange }) {
   }, [screen]);
 
   useEffect(() => {
+    if (screen !== "history") return;
+    let cancelled = false;
+    const refresh = () => {
+      api.listWorkouts().then((w) => { if (!cancelled) setWorkouts(w); }).catch(() => {});
+      api.listCardioSessions().then((cs) => { if (!cancelled) setCardioSessions(cs); }).catch(() => {});
+    };
+    const interval = setInterval(refresh, 8000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [screen]);
+
+  useEffect(() => {
     if (screen !== "cardio") return;
     let cancelled = false;
     const refresh = () => {
@@ -448,6 +459,10 @@ function Exerciser({ user, onUserChange }) {
   const workoutDates = new Set(workouts.map((w) => w.date));
   const cardioSessionDates = new Set(cardioSessions.map((s) => s.date));
 
+  // All activity dates merged and sorted descending for list view
+  const allActivityDates = [...new Set([...Object.keys(groupedHistory), ...cardioSessions.map((s) => s.date)])]
+    .sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
+
   const exerciseOptionsByBodyPart = workouts.reduce((groups, w) => {
     if (!groups[w.body_part]) groups[w.body_part] = [];
     if (!groups[w.body_part].some((e) => e.id === w.assigned_workout_id)) {
@@ -456,9 +471,23 @@ function Exerciser({ user, onUserChange }) {
     return groups;
   }, {});
 
-  const exerciseHistory = exerciseFilterId
+  // Unique cardio exercises that have at least one logged session
+  const cardioExerciseOptions = cardioSessions.reduce((acc, s) => {
+    if (s.cardio_exercise_id && !acc.some((ex) => ex.id === s.cardio_exercise_id)) {
+      acc.push({ id: s.cardio_exercise_id, name: s.exercise_name, icon: s.exercise_icon });
+    }
+    return acc;
+  }, []);
+
+  const isCardioFilter = exerciseFilterBodyPart === "__cardio__";
+
+  const exerciseHistory = !isCardioFilter && exerciseFilterId
     ? workouts.filter((w) => w.assigned_workout_id === exerciseFilterId)
     : [];
+
+  const latestCardioSession = isCardioFilter && exerciseFilterId
+    ? cardioSessions.find((s) => s.cardio_exercise_id === exerciseFilterId) || null
+    : null;
 
   const goToMonth = (delta) => {
     setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + delta, 1));
@@ -550,6 +579,19 @@ function Exerciser({ user, onUserChange }) {
       </motion.div>
     );
   };
+
+  const renderCardioCard = (s, { showDate = false, index = 0, anim } = {}) => (
+    <motion.div className="card" key={`cs-${s.id}`} {...(anim || cardTransition(index))}>
+      <div className="row-between">
+        <div className="card-title">{s.exercise_icon} {s.exercise_name}</div>
+        <span className="tag tag-cardio">🏃 Cardio</span>
+      </div>
+      {showDate && <div className="card-subtitle">{formatDateLabel(s.date)}</div>}
+      <div className="card-subtitle">
+        {s.duration_minutes} min{s.calories_burned ? ` · ${s.calories_burned} kcal burned` : ""}
+      </div>
+    </motion.div>
+  );
 
   if (loading) {
     return (
@@ -799,15 +841,20 @@ function Exerciser({ user, onUserChange }) {
         <AnimatePresence mode="wait">
         {historyView === "list" && (
           <motion.div key="list" {...tabContent}>
-            {Object.keys(groupedHistory).length === 0 && (
-              <div className="card-subtitle">No workouts logged yet.</div>
+            {allActivityDates.length === 0 && (
+              <div className="card-subtitle">No activity logged yet.</div>
             )}
-            {Object.entries(groupedHistory).map(([date, items]) => (
-              <div className="date-group" key={date}>
-                <div className="date-heading">{formatDateLabel(date)}</div>
-                {items.map((item, idx) => renderWorkoutCard(item, { index: idx }))}
-              </div>
-            ))}
+            {allActivityDates.map((date) => {
+              const strengthItems = groupedHistory[date] || [];
+              const cardioItems = cardioSessions.filter((s) => s.date === date);
+              return (
+                <div className="date-group" key={date}>
+                  <div className="date-heading">{formatDateLabel(date)}</div>
+                  {strengthItems.map((item, idx) => renderWorkoutCard(item, { index: idx }))}
+                  {cardioItems.map((s, idx) => renderCardioCard(s, { index: strengthItems.length + idx }))}
+                </div>
+              );
+            })}
           </motion.div>
         )}
 
@@ -850,15 +897,9 @@ function Exerciser({ user, onUserChange }) {
               <motion.div className="section" key={selectedDate} {...tabContent}>
                 <div className="date-heading">{formatDateLabel(selectedDate)}</div>
                 {(groupedHistory[selectedDate] || []).map((item, idx) => renderWorkoutCard(item, { index: idx }))}
-                {cardioSessions.filter((s) => s.date === selectedDate).map((s, idx) => (
-                  <motion.div className="card" key={`cs-${s.id}`} {...cardTransition(idx)}>
-                    <div className="row-between">
-                      <div className="card-title">{s.exercise_icon} {s.exercise_name}</div>
-                      <span className="tag tag-cardio">🏃 Cardio</span>
-                    </div>
-                    <div className="card-subtitle">{s.duration_minutes} min{s.calories_burned ? ` · ${s.calories_burned} kcal` : ""}</div>
-                  </motion.div>
-                ))}
+                {cardioSessions.filter((s) => s.date === selectedDate).map((s, idx) =>
+                  renderCardioCard(s, { index: (groupedHistory[selectedDate] || []).length + idx })
+                )}
                 {(groupedHistory[selectedDate] || []).length === 0 && cardioSessions.filter((s) => s.date === selectedDate).length === 0 && (
                   <div className="card-subtitle">No activity logged on this date.</div>
                 )}
@@ -869,31 +910,38 @@ function Exerciser({ user, onUserChange }) {
 
         {historyView === "exercise" && (
           <motion.div key="exercise" {...tabContent}>
-            {Object.keys(exerciseOptionsByBodyPart).length === 0 ? (
-              <div className="card-subtitle">No workouts logged yet.</div>
+            {Object.keys(exerciseOptionsByBodyPart).length === 0 && cardioExerciseOptions.length === 0 ? (
+              <div className="card-subtitle">No activity logged yet.</div>
             ) : (
               <>
                 <div className="form-group">
-                  <label className="form-label">Body Part</label>
+                  <label className="form-label">Category</label>
                   <div className="chip-row">
                     {BODY_PARTS.filter((part) => exerciseOptionsByBodyPart[part.id]).map((part) => (
                       <button
                         key={part.id}
                         type="button"
                         className={`chip ${exerciseFilterBodyPart === part.id ? "active" : ""}`}
-                        onClick={() => {
-                          setExerciseFilterBodyPart(part.id);
-                          setExerciseFilterId(null);
-                        }}
+                        onClick={() => { setExerciseFilterBodyPart(part.id); setExerciseFilterId(null); }}
                       >
                         <span className="chip-icon">{part.icon}</span>
                         <span>{part.label}</span>
                       </button>
                     ))}
+                    {cardioExerciseOptions.length > 0 && (
+                      <button
+                        type="button"
+                        className={`chip ${isCardioFilter ? "active" : ""}`}
+                        onClick={() => { setExerciseFilterBodyPart("__cardio__"); setExerciseFilterId(null); }}
+                      >
+                        <span className="chip-icon">🏃</span>
+                        <span>Cardio</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {exerciseFilterBodyPart && (
+                {exerciseFilterBodyPart && !isCardioFilter && (
                   <div className="form-group">
                     <label className="form-label">Exercise</label>
                     <select
@@ -909,12 +957,27 @@ function Exerciser({ user, onUserChange }) {
                   </div>
                 )}
 
-                {exerciseFilterId && (
+                {isCardioFilter && (
+                  <div className="form-group">
+                    <label className="form-label">Cardio Exercise</label>
+                    <select
+                      className="form-select"
+                      value={exerciseFilterId || ""}
+                      onChange={(e) => setExerciseFilterId(Number(e.target.value) || null)}
+                    >
+                      <option value="">Select an exercise</option>
+                      {cardioExerciseOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>{opt.icon} {opt.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {!isCardioFilter && exerciseFilterId && (
                   <div className="section">
                     <div className="section-title">Latest Record</div>
                     <div className="info-box">
-                      Showing only your most recent logged session for this exercise. For full history, switch
-                      to the List or Calendar view.
+                      Showing your most recent logged session. Switch to List or Calendar for full history.
                     </div>
                     {exerciseHistory.length === 0 ? (
                       <div className="card-subtitle">No history logged for this exercise yet.</div>
@@ -922,6 +985,22 @@ function Exerciser({ user, onUserChange }) {
                       <AnimatePresence mode="wait">
                         {renderWorkoutCard(exerciseHistory[0], { showDate: true, anim: popIn })}
                       </AnimatePresence>
+                    )}
+                  </div>
+                )}
+
+                {isCardioFilter && exerciseFilterId && (
+                  <div className="section">
+                    <div className="section-title">Latest Record</div>
+                    <div className="info-box">
+                      Showing your most recent logged session. Switch to List or Calendar for full history.
+                    </div>
+                    {latestCardioSession ? (
+                      <AnimatePresence mode="wait">
+                        {renderCardioCard(latestCardioSession, { showDate: true, anim: popIn })}
+                      </AnimatePresence>
+                    ) : (
+                      <div className="card-subtitle">No history logged for this exercise yet.</div>
                     )}
                   </div>
                 )}
