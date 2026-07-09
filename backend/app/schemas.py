@@ -182,6 +182,11 @@ class CardioExerciseCreate(BaseModel):
     icon: str = Field(min_length=1, max_length=10, default="🏃")
     tracks_calories: bool = True
 
+    @field_validator("name")
+    @classmethod
+    def _title_case_name(cls, v: str) -> str:
+        return v.strip().title()
+
 
 class CardioExerciseOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -316,10 +321,20 @@ class AssignWorkoutCreate(BaseModel):
     body_part: BodyPart
     exercise: str = Field(min_length=1, max_length=120)
 
+    @field_validator("exercise")
+    @classmethod
+    def _title_case_exercise(cls, v: str) -> str:
+        return v.strip().title()
+
 
 class AssignedWorkoutUpdate(BaseModel):
     body_part: Optional[BodyPart] = None
     exercise: Optional[str] = Field(default=None, min_length=1, max_length=120)
+
+    @field_validator("exercise")
+    @classmethod
+    def _title_case_exercise(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip().title() if v is not None else v
 
 
 class TrainerNoteOut(BaseModel):
