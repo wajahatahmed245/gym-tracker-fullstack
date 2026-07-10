@@ -9,6 +9,7 @@ import { api } from "../api/client";
 import { screenTransition, cardTransition, tabContent, tapScale, popIn } from "../utils/motion";
 import AvailabilityCalendar from "./AvailabilityCalendar";
 import UnavailabilityTicker from "./UnavailabilityTicker";
+import { StrengthChart, CardioChart } from "./ProgressChart";
 
 function HealthCard({ health, currentWeight }) {
   const { healthy_weight_min_kg: min, healthy_weight_max_kg: max } = health;
@@ -974,35 +975,51 @@ function Exerciser({ user, onUserChange }) {
                 )}
 
                 {!isCardioFilter && exerciseFilterId && (
-                  <div className="section">
-                    <div className="section-title">Latest Record</div>
-                    <div className="info-box">
-                      Showing your most recent logged session. Switch to List or Calendar for full history.
-                    </div>
-                    {exerciseHistory.length === 0 ? (
-                      <div className="card-subtitle">No history logged for this exercise yet.</div>
-                    ) : (
-                      <AnimatePresence mode="wait">
-                        {renderWorkoutCard(exerciseHistory[0], { showDate: true, anim: popIn })}
-                      </AnimatePresence>
+                  <>
+                    {exerciseHistory.length > 0 && (
+                      <div className="section">
+                        <div className="section-title">Progression</div>
+                        <StrengthChart history={exerciseHistory} />
+                      </div>
                     )}
-                  </div>
+                    <div className="section">
+                      <div className="section-title">Latest Record</div>
+                      <div className="info-box">
+                        Showing your most recent logged session. Switch to List or Calendar for full history.
+                      </div>
+                      {exerciseHistory.length === 0 ? (
+                        <div className="card-subtitle">No history logged for this exercise yet.</div>
+                      ) : (
+                        <AnimatePresence mode="wait">
+                          {renderWorkoutCard(exerciseHistory[0], { showDate: true, anim: popIn })}
+                        </AnimatePresence>
+                      )}
+                    </div>
+                  </>
                 )}
 
                 {isCardioFilter && exerciseFilterId && (
-                  <div className="section">
-                    <div className="section-title">Latest Record</div>
-                    <div className="info-box">
-                      Showing your most recent logged session. Switch to List or Calendar for full history.
-                    </div>
-                    {latestCardioSession ? (
-                      <AnimatePresence mode="wait">
-                        {renderCardioCard(latestCardioSession, { showDate: true, anim: popIn })}
-                      </AnimatePresence>
-                    ) : (
-                      <div className="card-subtitle">No history logged for this exercise yet.</div>
+                  <>
+                    {cardioSessions.filter((s) => s.cardio_exercise_id === exerciseFilterId).length > 0 && (
+                      <div className="section">
+                        <div className="section-title">Progression</div>
+                        <CardioChart sessions={cardioSessions.filter((s) => s.cardio_exercise_id === exerciseFilterId)} />
+                      </div>
                     )}
-                  </div>
+                    <div className="section">
+                      <div className="section-title">Latest Record</div>
+                      <div className="info-box">
+                        Showing your most recent logged session. Switch to List or Calendar for full history.
+                      </div>
+                      {latestCardioSession ? (
+                        <AnimatePresence mode="wait">
+                          {renderCardioCard(latestCardioSession, { showDate: true, anim: popIn })}
+                        </AnimatePresence>
+                      ) : (
+                        <div className="card-subtitle">No history logged for this exercise yet.</div>
+                      )}
+                    </div>
+                  </>
                 )}
               </>
             )}

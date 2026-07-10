@@ -12,6 +12,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-scripts": "5.0.1",
+    "recharts": "^3.9.2",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
@@ -37,5 +38,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
   }
 }
