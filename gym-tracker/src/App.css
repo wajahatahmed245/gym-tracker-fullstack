@@ -1119,3 +1119,67 @@ body {
   margin-bottom: 10px;
   text-align: center;
 }
+
+/* Nutrition prompt card */
+.nutrition-prompt {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  background: #eaf7f4;
+  border-left: 4px solid #0f766e;
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin: 12px 0;
+}
+.nutrition-prompt-body {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex: 1;
+}
+.nutrition-prompt-icon {
+  font-size: 22px;
+  line-height: 1;
+  margin-top: 2px;
+}
+.nutrition-prompt-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f766e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+.nutrition-prompt-message {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+.nutrition-suggestions { margin-top: 4px; }
+.nutrition-suggestions-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.nutrition-suggestions-list {
+  margin: 4px 0 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--color-text);
+}
+.nutrition-suggestions-list li { margin-bottom: 2px; }
+.nutrition-serving { color: var(--color-text-muted); }
+.nutrition-dismiss {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}

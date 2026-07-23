@@ -10,6 +10,7 @@ import { screenTransition, cardTransition, tabContent, tapScale, popIn } from ".
 import AvailabilityCalendar from "./AvailabilityCalendar";
 import UnavailabilityTicker from "./UnavailabilityTicker";
 import { StrengthChart, CardioChart } from "./ProgressChart";
+import NutritionPrompt from "./NutritionPrompt";
 
 function HealthCard({ health, currentWeight }) {
   const { healthy_weight_min_kg: min, healthy_weight_max_kg: max } = health;
@@ -70,6 +71,8 @@ function Exerciser({ user, onUserChange }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
+  const [postWorkoutPromptId, setPostWorkoutPromptId] = useState(null); // assigned_workout_id just logged
+  const [postCardioPrompt, setPostCardioPrompt] = useState(false);
 
   const [dashboard, setDashboard] = useState({ workouts_this_week: 0, days_since_last_workout: null });
   const [workouts, setWorkouts] = useState([]);
@@ -357,6 +360,7 @@ function Exerciser({ user, onUserChange }) {
       setLastSessions((prev) => ({ ...prev, [assigned.id]: logged }));
       setSavedMessage("Workout logged successfully!");
       setLogSets([{ reps: "", weight: "" }]);
+      setPostWorkoutPromptId(assigned.id);
       setExpandedId(null);
     } catch (err) {
       setError(err.message || "Failed to log workout.");
@@ -382,6 +386,8 @@ function Exerciser({ user, onUserChange }) {
       setWorkouts(await api.listWorkouts());
       setSavedMessage("Cardio logged!");
       setCardioForm((f) => ({ exerciseId: f.exerciseId, duration: "", calories: "", date: toLocalDateStr(new Date()) }));
+      const { show_post_workout_prompt } = await api.nutritionCardioShouldShowPost(Number(cardioForm.duration));
+      setPostCardioPrompt(show_post_workout_prompt);
     } catch (err) {
       setError(err.message || "Failed to log cardio.");
     }
@@ -722,6 +728,10 @@ function Exerciser({ user, onUserChange }) {
                     </button>
                   </div>
 
+                  {postWorkoutPromptId === assigned.id && (
+                    <NutritionPrompt timing="post_workout" />
+                  )}
+
                   {expandedId === assigned.id && (
                     <motion.form
                       onSubmit={(e) => submitLog(e, assigned)}
@@ -730,6 +740,8 @@ function Exerciser({ user, onUserChange }) {
                       transition={{ duration: 0.2, ease: "easeOut" }}
                       style={{ overflow: "hidden" }}
                     >
+                      <NutritionPrompt timing="pre_workout" />
+
                       {last && (
                         <div className="card-subtitle">
                           Last ({formatDateLabel(last.date)}): {last.sets
@@ -1051,6 +1063,7 @@ function Exerciser({ user, onUserChange }) {
             {savedMessage}
           </motion.div>
         )}
+        {postCardioPrompt && <NutritionPrompt timing="post_workout" />}
 
         {cardioExercises.length === 0 ? (
           <div className="info-box">Your trainer hasn't added any cardio exercises yet.</div>

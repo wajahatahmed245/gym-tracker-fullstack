@@ -136,4 +136,15 @@ export const api = {
   updateTrainerPhone: (id, phone) =>
     request(`/admin/trainers/${id}/phone`, { method: "PATCH", body: { phone } }),
   deleteTrainer: (id) => request(`/admin/trainers/${id}`, { method: "DELETE" }),
+
+  nutritionPreWorkout: (params = {}) => {
+    const q = new URLSearchParams();
+    if (params.minutesSinceLastProteinMeal != null) q.set("minutes_since_last_protein_meal", params.minutesSinceLastProteinMeal);
+    if (params.gramsInThatMeal != null) q.set("grams_in_that_meal", params.gramsInThatMeal);
+    return request(`/nutrition/pre-workout${q.toString() ? "?" + q.toString() : ""}`);
+  },
+  nutritionPostWorkout: () => request("/nutrition/post-workout"),
+  nutritionPostWorkoutSecondDose: () => request("/nutrition/post-workout/second-dose"),
+  nutritionCardioShouldShowPost: (durationMinutes, highIntensity = false) =>
+    request(`/nutrition/cardio/should-show-post-prompt?duration_minutes=${durationMinutes}&high_intensity=${highIntensity}`),
 };

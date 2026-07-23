@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import BASE_DIR, settings
 from .database import SessionLocal
 from .logging_config import logger, setup_logging
-from .routers import admin, auth, availability, cardio, exerciser, trainer
+from .routers import admin, auth, availability, cardio, exerciser, nutrition, trainer
 from .seed import seed_admin
 
 setup_logging()
@@ -59,6 +59,7 @@ app.include_router(auth.router)
 app.include_router(availability.router)
 app.include_router(cardio.router)
 app.include_router(exerciser.router)
+app.include_router(nutrition.router)
 app.include_router(trainer.router)
 app.include_router(admin.router)
 
