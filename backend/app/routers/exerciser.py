@@ -29,6 +29,7 @@ from ..schemas import (
     DashboardOut,
     ExerciserProfileOut,
     ExerciserProfileUpdate,
+    ExerciseStatusItem,
     LeaveNoteIn,
     TrainerListItem,
     TrainerSelect,
@@ -81,6 +82,63 @@ def dashboard(user: User = Depends(require_exerciser), db: Session = Depends(get
         workouts_this_week=crud.workouts_this_week(db, exerciser_id=user.id),
         days_since_last_workout=crud.days_since_last_workout(db, exerciser_id=user.id),
     )
+
+
+@router.get("/exerciser/exercise-status", response_model=List[ExerciseStatusItem])
+def exercise_status(user: User = Depends(require_exerciser), db: Session = Depends(get_db)):
+    assigned_workouts = db.execute(
+        select(AssignedWorkout)
+        .where(AssignedWorkout.exerciser_id == user.id, AssignedWorkout.active.is_(True))
+    ).scalars().all()
+
+    # Group assigned workout IDs by body part
+    body_part_ids: dict = {}
+    for aw in assigned_workouts:
+        body_part_ids.setdefault(aw.body_part, []).append(aw.id)
+
+    today = date.today()
+    result = []
+
+    for body_part, aw_ids in sorted(body_part_ids.items(), key=lambda x: x[0].value):
+        last_workout = db.execute(
+            select(Workout)
+            .where(Workout.assigned_workout_id.in_(aw_ids))
+            .order_by(Workout.date.desc())
+            .limit(1)
+        ).scalars().first()
+
+        if last_workout is None:
+            status = "never"
+            days_since = None
+            message = "Never trained — time to start!"
+        else:
+            days_since = (today - last_workout.date).days
+            if days_since <= 4:
+                status = "up_to_date"
+                message = f"Trained {days_since} day{'s' if days_since != 1 else ''} ago — great work!"
+            elif days_since <= 7:
+                status = "due_soon"
+                message = f"{days_since} days since last {body_part.value} session — due soon."
+            else:
+                status = "overdue"
+                message = f"{days_since} days since last {body_part.value} workout — overdue!"
+
+        result.append(ExerciseStatusItem(
+            assigned_workout_id=aw_ids[0],
+            exercise=body_part.value,
+            body_part=body_part,
+            last_performed_date=last_workout.date if last_workout else None,
+            days_since_last=days_since,
+            status=status,
+            message=message,
+        ))
+
+    return result
+
+
+@router.get("/exerciser/profile", response_model=ExerciserProfileOut)
+def get_profile(user: User = Depends(require_exerciser)):
+    return user.exerciser_profile
 
 
 @router.patch("/exerciser/profile", response_model=ExerciserProfileOut)
@@ -168,6 +226,38 @@ def log_assigned_workout(
     db: Session = Depends(get_db),
 ):
     assigned = _get_own_assigned_workout_or_404(db, user, assigned_id)
+
+    REST_SECONDS = 180
+
+    # Reject if the user saved a workout within the last 3 minutes (API-bypass protection).
+    recent = db.execute(
+        select(Workout)
+        .where(Workout.exerciser_id == user.id)
+        .order_by(Workout.created_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    if recent is not None:
+        elapsed = (datetime.utcnow() - recent.created_at).total_seconds()
+        if elapsed < REST_SECONDS:
+            wait = int(REST_SECONDS - elapsed)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Rest period active. Wait {wait} more second(s) before logging the next set.",
+            )
+
+    # Validate per-set rest gaps when timestamps are provided.
+    timestamped = [s for s in payload.sets if s.logged_at is not None]
+    if len(timestamped) >= 2:
+        for i in range(1, len(timestamped)):
+            gap = (timestamped[i].logged_at - timestamped[i - 1].logged_at).total_seconds()
+            if gap < REST_SECONDS:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"Set {i + 1} was logged {int(gap)}s after set {i}. "
+                        f"Minimum rest between sets is {REST_SECONDS}s."
+                    ),
+                )
 
     workout = Workout(
         exerciser_id=user.id,

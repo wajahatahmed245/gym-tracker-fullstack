@@ -76,6 +76,7 @@ export const api = {
   listCardioSessions: () => request("/exerciser/cardio-sessions"),
   logCardioSession: (payload) => request("/exerciser/cardio-sessions", { method: "POST", body: payload }),
   deleteCardioSession: (id) => request(`/exerciser/cardio-sessions/${id}`, { method: "DELETE" }),
+  exerciseStatus: () => request("/exerciser/exercise-status"),
   assignedWorkouts: () => request("/exerciser/assigned-workouts"),
   logAssignedWorkout: (assignedId, payload) =>
     request(`/exerciser/assigned-workouts/${assignedId}/log`, { method: "POST", body: payload }),

@@ -11,6 +11,8 @@ import AvailabilityCalendar from "./AvailabilityCalendar";
 import UnavailabilityTicker from "./UnavailabilityTicker";
 import { StrengthChart, CardioChart } from "./ProgressChart";
 import NutritionPrompt from "./NutritionPrompt";
+import ExerciseStatus from "./ExerciseStatus";
+import RestTimer, { startRestTimer, clearRestTimer, useRestTimerRemaining } from "./RestTimer";
 
 function HealthCard({ health, currentWeight }) {
   const { healthy_weight_min_kg: min, healthy_weight_max_kg: max } = health;
@@ -73,6 +75,7 @@ function Exerciser({ user, onUserChange }) {
   const [savedMessage, setSavedMessage] = useState("");
   const [postWorkoutPromptId, setPostWorkoutPromptId] = useState(null); // assigned_workout_id just logged
   const [postCardioPrompt, setPostCardioPrompt] = useState(false);
+  const [statusRefresh, setStatusRefresh] = useState(0);
 
   const [dashboard, setDashboard] = useState({ workouts_this_week: 0, days_since_last_workout: null });
   const [workouts, setWorkouts] = useState([]);
@@ -84,7 +87,7 @@ function Exerciser({ user, onUserChange }) {
   const [trainerError, setTrainerError] = useState("");
 
   const [expandedId, setExpandedId] = useState(null);
-  const [logSets, setLogSets] = useState([{ reps: "", weight: "" }]);
+  const [logSets, setLogSets] = useState([{ reps: "", weight: "", logged: false, logged_at: null }]);
   const [lastSessions, setLastSessions] = useState({});
 
   const [showLeaveForm, setShowLeaveForm] = useState(false);
@@ -111,6 +114,9 @@ function Exerciser({ user, onUserChange }) {
 
   const [myUnavailableDates, setMyUnavailableDates] = useState([]);
   const [trainerUnavailableDates, setTrainerUnavailableDates] = useState([]);
+
+  const restRemaining = useRestTimerRemaining(user.id);
+  const restActive = restRemaining !== null && restRemaining > 0;
 
   const trainerId = user?.exerciser_profile?.trainer_id || null;
   const currentTrainer = trainers.find((t) => t.id === trainerId);
@@ -244,7 +250,7 @@ function Exerciser({ user, onUserChange }) {
   };
 
   const addSetRow = () => {
-    setLogSets([...logSets, { reps: "", weight: "" }]);
+    setLogSets([...logSets, { reps: "", weight: "", logged: false, logged_at: null }]);
   };
 
   const removeSetRow = (index) => {
@@ -331,7 +337,7 @@ function Exerciser({ user, onUserChange }) {
       return;
     }
     setExpandedId(assigned.id);
-    setLogSets([{ reps: "", weight: "" }]);
+    setLogSets([{ reps: "", weight: "", logged: false, logged_at: null }]);
     setLogDate(toLocalDateStr(new Date()));
     if (!(assigned.id in lastSessions)) {
       api
@@ -343,6 +349,17 @@ function Exerciser({ user, onUserChange }) {
     }
   };
 
+  const logSingleSet = (idx) => {
+    const row = logSets[idx];
+    if (!row.reps || row.weight === "" || row.logged || restActive) return;
+    startRestTimer(user.id);
+    setLogSets((prev) =>
+      prev.map((r, i) =>
+        i === idx ? { ...r, logged: true, logged_at: new Date().toISOString() } : r
+      )
+    );
+  };
+
   const submitLog = async (e, assigned) => {
     e.preventDefault();
     if (logSets.length === 0 || logSets.some((row) => !row.reps || row.weight === "")) {
@@ -351,7 +368,11 @@ function Exerciser({ user, onUserChange }) {
     setError("");
     try {
       const logged = await api.logAssignedWorkout(assigned.id, {
-        sets: logSets.map((row) => ({ reps: Number(row.reps), weight: Number(row.weight) })),
+        sets: logSets.map((row) => ({
+          reps: Number(row.reps),
+          weight: Number(row.weight),
+          ...(row.logged_at ? { logged_at: row.logged_at } : {}),
+        })),
         date: logDate,
       });
       const [dash, w] = await Promise.all([api.dashboard(), api.listWorkouts()]);
@@ -359,7 +380,9 @@ function Exerciser({ user, onUserChange }) {
       setWorkouts(w);
       setLastSessions((prev) => ({ ...prev, [assigned.id]: logged }));
       setSavedMessage("Workout logged successfully!");
-      setLogSets([{ reps: "", weight: "" }]);
+      setLogSets([{ reps: "", weight: "", logged: false, logged_at: null }]);
+      clearRestTimer(user.id);
+      setStatusRefresh((n) => n + 1);
       setPostWorkoutPromptId(assigned.id);
       setExpandedId(null);
     } catch (err) {
@@ -638,6 +661,10 @@ function Exerciser({ user, onUserChange }) {
         </div>
 
         <div className="section">
+          <ExerciseStatus refreshTrigger={statusRefresh} />
+        </div>
+
+        <div className="section">
           <div className="section-title">⚖️ Health Snapshot</div>
           {user?.exerciser_profile?.health ? (
             <HealthCard
@@ -710,6 +737,8 @@ function Exerciser({ user, onUserChange }) {
           </motion.div>
         )}
 
+        <RestTimer userId={user.id} />
+
         {assignedWorkouts.length === 0 && (
           <div className="info-box">Your trainer hasn't assigned any exercises yet.</div>
         )}
@@ -765,37 +794,58 @@ function Exerciser({ user, onUserChange }) {
                       </div>
 
                       {logSets.map((row, idx) => (
-                        <div className="form-row" key={idx}>
-                          <div className="form-group">
-                            <label className="form-label">Set {idx + 1} Weight (kg)</label>
-                            <input
-                              className="form-input"
-                              type="number"
-                              min="0"
-                              placeholder="80"
-                              value={row.weight}
-                              onChange={(e) => updateSetRow(idx, "weight", e.target.value)}
-                            />
-                          </div>
-                          <div className="form-group">
-                            <label className="form-label">Reps</label>
-                            <input
-                              className="form-input"
-                              type="number"
-                              min="1"
-                              placeholder="8"
-                              value={row.reps}
-                              onChange={(e) => updateSetRow(idx, "reps", e.target.value)}
-                            />
-                          </div>
-                          {logSets.length > 1 && (
+                        <div key={idx}>
+                          <div className="form-row">
+                            <div className="form-group">
+                              <label className="form-label">Set {idx + 1} Weight (kg)</label>
+                              <input
+                                className="form-input"
+                                type="number"
+                                min="0"
+                                placeholder="80"
+                                value={row.weight}
+                                disabled={row.logged}
+                                onChange={(e) => updateSetRow(idx, "weight", e.target.value)}
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Reps</label>
+                              <input
+                                className="form-input"
+                                type="number"
+                                min="1"
+                                placeholder="8"
+                                value={row.reps}
+                                disabled={row.logged}
+                                onChange={(e) => updateSetRow(idx, "reps", e.target.value)}
+                              />
+                            </div>
                             <button
-                              className="btn btn-outline"
                               type="button"
-                              onClick={() => removeSetRow(idx)}
+                              className={`set-log-btn${row.logged ? " set-log-btn--done" : ""}${!row.logged && restActive ? " set-log-btn--waiting" : ""}`}
+                              disabled={row.logged || !row.reps || row.weight === "" || restActive}
+                              onClick={() => logSingleSet(idx)}
                             >
-                              Remove
+                              {row.logged
+                                ? "✓ Done"
+                                : restActive && row.reps && row.weight !== ""
+                                  ? `Wait ${String(Math.floor(restRemaining / 60)).padStart(2, "0")}:${String(restRemaining % 60).padStart(2, "0")}`
+                                  : "Log Set"}
                             </button>
+                            {!row.logged && logSets.length > 1 && (
+                              <button
+                                className="btn btn-outline"
+                                type="button"
+                                onClick={() => removeSetRow(idx)}
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                          {row.logged && row.logged_at && (
+                            <div className="set-logged-at">
+                              Completed {new Date(row.logged_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </div>
                           )}
                         </div>
                       ))}

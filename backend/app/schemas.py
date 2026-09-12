@@ -132,9 +132,20 @@ class DashboardOut(BaseModel):
     days_since_last_workout: Optional[int] = None
 
 
+class ExerciseStatusItem(BaseModel):
+    assigned_workout_id: int
+    exercise: str
+    body_part: BodyPart
+    last_performed_date: Optional[date_type] = None
+    days_since_last: Optional[int] = None
+    status: str  # "never" | "up_to_date" | "due_soon" | "overdue"
+    message: str
+
+
 class WorkoutSetIn(BaseModel):
     reps: int = Field(gt=0)
     weight: float = Field(ge=0)
+    logged_at: Optional[datetime] = None
 
 
 class WorkoutSetOut(BaseModel):
