@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import require_approved_trainer, require_role
+from ..events import publish_cardio_deleted, publish_cardio_logged
 from ..logging_config import logger
 from ..models import CardioExercise, CardioSession, ExerciserProfile, Role, User
 from ..schemas import CardioExerciseCreate, CardioExerciseOut, CardioSessionCreate, CardioSessionOut
@@ -147,6 +148,14 @@ def log_cardio_session(
     db.commit()
     db.refresh(session)
     logger.info("Exerciser %s logged cardio: %s %smin", user.id, ex.name, payload.duration_minutes)
+    publish_cardio_logged(
+        session_id=session.id,
+        exerciser_id=user.id,
+        exercise_name=ex.name,
+        duration_minutes=session.duration_minutes,
+        calories_burned=session.calories_burned,
+        session_date=session.date,
+    )
     return _session_out(session)
 
 
@@ -161,3 +170,4 @@ def delete_cardio_session(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
     db.delete(s)
     db.commit()
+    publish_cardio_deleted(session_id=session_id, exerciser_id=user.id)

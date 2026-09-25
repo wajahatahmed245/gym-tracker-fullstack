@@ -1,21 +1,74 @@
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 64mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+      - tracker-bus
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   backend:
     build:
       context: ./backend
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"   # localhost only — nginx proxies externally
     env_file:
       - ./backend/.env
+    environment:
+      REDIS_URL: "redis://redis:6379/0"
     volumes:
       - ./backend/data:/app/data
       - ./backend/logs:/app/logs
+    networks:
+      - internal
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   frontend:
     build:
       context: ./gym-tracker
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "127.0.0.1:3001:80"
+    networks:
+      - internal
     depends_on:
       - backend
+
+  mcp:
+    build:
+      context: ./mcp_server
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      GYM_API_BASE_URL: "http://backend:8000/api/mcp"
+    ports:
+      - "127.0.0.1:8001:8001"
+    networks:
+      - internal
+    depends_on:
+      - backend
+
+volumes:
+  redis_data:
+
+networks:
+  internal:
+  tracker-bus:
+    name: tracker-bus
+    external: true

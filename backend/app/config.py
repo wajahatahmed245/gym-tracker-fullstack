@@ -21,5 +21,11 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_dir: Path = BASE_DIR / "logs"
 
+    # MCP service key — set a strong random value in .env to enable MCP access
+    mcp_api_key: str = ""
+
+    # Redis Streams — event bus for cross-app integration
+    redis_url: str = "redis://localhost:6379/0"
+
 
 settings = Settings()

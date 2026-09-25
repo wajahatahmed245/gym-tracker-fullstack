@@ -10,6 +10,11 @@ from sqlalchemy.orm import Session
 from .. import crud
 from ..database import get_db
 from ..deps import require_role
+from ..events import (
+    publish_workout_deleted,
+    publish_workout_logged,
+    publish_workout_updated,
+)
 from ..logging_config import logger
 from ..models import (
     AccountStatus,
@@ -192,6 +197,15 @@ def update_workout(
         "Workout updated: exerciser_id=%s workout_id=%s sets=%s",
         user.id, workout.id, len(payload.sets),
     )
+    assigned = workout.assigned_workout
+    publish_workout_updated(
+        workout_id=workout.id,
+        exerciser_id=user.id,
+        exercise_name=assigned.exercise,
+        body_part=assigned.body_part.value,
+        set_count=len(workout.sets),
+        workout_date=workout.date,
+    )
     return _workout_out(workout)
 
 
@@ -203,6 +217,7 @@ def delete_workout(workout_id: int, user: User = Depends(require_exerciser), db:
     db.commit()
 
     logger.info("Workout deleted: exerciser_id=%s workout_id=%s", user.id, workout_id)
+    publish_workout_deleted(workout_id=workout_id, exerciser_id=user.id)
 
 
 @router.get("/exerciser/assigned-workouts", response_model=List[AssignedWorkoutOut])
@@ -274,6 +289,14 @@ def log_assigned_workout(
     logger.info(
         "Workout logged: exerciser_id=%s assigned_workout_id=%s exercise=%s sets=%s",
         user.id, assigned.id, assigned.exercise, len(payload.sets),
+    )
+    publish_workout_logged(
+        workout_id=workout.id,
+        exerciser_id=user.id,
+        exercise_name=assigned.exercise,
+        body_part=assigned.body_part.value,
+        set_count=len(workout.sets),
+        workout_date=workout.date,
     )
     return _workout_out(workout)
 
