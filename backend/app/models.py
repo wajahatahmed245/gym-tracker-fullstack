@@ -165,6 +165,7 @@ class Workout(Base):
         ForeignKey("assigned_workouts.id"), nullable=False, index=True
     )
     date: Mapped[date] = mapped_column(Date, nullable=False)
+    gym_name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     assigned_workout: Mapped["AssignedWorkout"] = relationship("AssignedWorkout", back_populates="logs")
@@ -292,3 +293,12 @@ class Unavailability(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped["User"] = relationship("User", back_populates="unavailable_dates")
+
+
+class UserGym(Base):
+    __tablename__ = "user_gyms"
+    __table_args__ = (UniqueConstraint("exerciser_id", "name", name="uq_user_gym_exerciser_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    exerciser_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)

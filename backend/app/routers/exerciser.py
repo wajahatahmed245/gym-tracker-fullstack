@@ -26,6 +26,7 @@ from ..models import (
     TrainerProfile,
     Unavailability,
     User,
+    UserGym,
     Workout,
     WorkoutSet,
 )
@@ -39,6 +40,8 @@ from ..schemas import (
     TrainerListItem,
     TrainerSelect,
     UnavailableDateOut,
+    UserGymOut,
+    UserGymRename,
     WorkoutLogCreate,
     WorkoutOut,
     WorkoutSetOut,
@@ -60,6 +63,7 @@ def _workout_out(workout: Workout) -> WorkoutOut:
         exercise=assigned.exercise,
         trainer_name=trainer.name if trainer else "Former trainer",
         date=workout.date,
+        gym_name=workout.gym_name,
         sets=[
             WorkoutSetOut(set_number=s.set_number, reps=s.reps, weight=s.weight, weight_unit=getattr(s, "weight_unit", "kg"))
             for s in workout.sets
@@ -79,6 +83,55 @@ def _get_own_workout_or_404(db: Session, user: User, workout_id: int) -> Workout
     if workout is None or workout.exerciser_id != user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workout not found")
     return workout
+
+
+def _ensure_gym_saved(db: Session, exerciser_id: int, gym_name: str) -> None:
+    """Upsert a gym name into user_gyms within the current transaction."""
+    exists = db.execute(
+        select(UserGym).where(UserGym.exerciser_id == exerciser_id, UserGym.name == gym_name)
+    ).scalar_one_or_none()
+    if exists is None:
+        db.add(UserGym(exerciser_id=exerciser_id, name=gym_name))
+        db.flush()
+
+
+@router.get("/exerciser/gyms", response_model=List[UserGymOut])
+def list_user_gyms(user: User = Depends(require_exerciser), db: Session = Depends(get_db)):
+    return db.execute(
+        select(UserGym)
+        .where(UserGym.exerciser_id == user.id)
+        .order_by(UserGym.name)
+    ).scalars().all()
+
+
+@router.patch("/exerciser/gyms/{gym_id}", response_model=UserGymOut)
+def rename_gym(
+    gym_id: int,
+    payload: UserGymRename,
+    user: User = Depends(require_exerciser),
+    db: Session = Depends(get_db),
+):
+    gym = db.execute(
+        select(UserGym).where(UserGym.id == gym_id, UserGym.exerciser_id == user.id)
+    ).scalar_one_or_none()
+    if gym is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Gym not found")
+
+    new_name = payload.name.strip()
+    conflict = db.execute(
+        select(UserGym).where(
+            UserGym.exerciser_id == user.id,
+            UserGym.name == new_name,
+            UserGym.id != gym_id,
+        )
+    ).scalar_one_or_none()
+    if conflict:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A gym with this name already exists")
+
+    gym.name = new_name
+    db.commit()
+    db.refresh(gym)
+    return gym
 
 
 @router.get("/exerciser/dashboard", response_model=DashboardOut)
@@ -185,11 +238,14 @@ def update_workout(
 
     if payload.date is not None:
         workout.date = payload.date
+    workout.gym_name = payload.gym_name or None
 
     workout.sets.clear()
     for set_number, set_in in enumerate(payload.sets, start=1):
         workout.sets.append(WorkoutSet(set_number=set_number, reps=set_in.reps, weight=set_in.weight, weight_unit=set_in.weight_unit))
 
+    if payload.gym_name:
+        _ensure_gym_saved(db, user.id, payload.gym_name)
     db.commit()
     db.refresh(workout)
 
@@ -278,11 +334,14 @@ def log_assigned_workout(
         exerciser_id=user.id,
         assigned_workout_id=assigned.id,
         date=payload.date or date.today(),
+        gym_name=payload.gym_name or None,
     )
     for set_number, set_in in enumerate(payload.sets, start=1):
         workout.sets.append(WorkoutSet(set_number=set_number, reps=set_in.reps, weight=set_in.weight, weight_unit=set_in.weight_unit))
 
     db.add(workout)
+    if payload.gym_name:
+        _ensure_gym_saved(db, user.id, payload.gym_name)
     db.commit()
     db.refresh(workout)
 

@@ -89,6 +89,11 @@ function Exerciser({ user, onUserChange }) {
   const [expandedId, setExpandedId] = useState(null);
   const [logSets, setLogSets] = useState([{ reps: "", weight: "", weight_unit: "kg", logged: false, logged_at: null }]);
   const [lastSessions, setLastSessions] = useState({});
+  const [gymName, setGymName] = useState("");
+  const [userGyms, setUserGyms] = useState([]);
+  const [manageGymsOpen, setManageGymsOpen] = useState(false);
+  const [renamingGymId, setRenamingGymId] = useState(null);
+  const [renamingGymValue, setRenamingGymValue] = useState("");
 
   const [showLeaveForm, setShowLeaveForm] = useState(false);
   const [leaveNote, setLeaveNote] = useState("");
@@ -96,6 +101,7 @@ function Exerciser({ user, onUserChange }) {
   const [editingWorkoutId, setEditingWorkoutId] = useState(null);
   const [editWorkoutSets, setEditWorkoutSets] = useState([{ reps: "", weight: "", weight_unit: "kg" }]);
   const [editWorkoutDate, setEditWorkoutDate] = useState(() => toLocalDateStr(new Date()));
+  const [editGymName, setEditGymName] = useState("");
 
   const [logDate, setLogDate] = useState(() => toLocalDateStr(new Date()));
 
@@ -141,8 +147,9 @@ function Exerciser({ user, onUserChange }) {
       api.listTrainers(),
       api.exerciserCardioExercises(),
       api.listCardioSessions(),
+      api.listUserGyms().catch(() => []),
     ])
-      .then(([dash, w, aw, t, ce, cs]) => {
+      .then(([dash, w, aw, t, ce, cs, gyms]) => {
         if (cancelled) return;
         setDashboard(dash);
         setWorkouts(w);
@@ -150,6 +157,7 @@ function Exerciser({ user, onUserChange }) {
         setTrainers(t);
         setCardioExercises(ce);
         setCardioSessions(cs);
+        setUserGyms(gyms);
         setCardioForm((f) => ({ ...f, date: toLocalDateStr(new Date()) }));
       })
       .catch((err) => {
@@ -276,6 +284,7 @@ function Exerciser({ user, onUserChange }) {
     setEditingWorkoutId(item.id);
     setEditWorkoutSets(item.sets.map((s) => ({ reps: String(s.reps), weight: String(s.weight), weight_unit: s.weight_unit || "kg" })));
     setEditWorkoutDate(item.date);
+    setEditGymName(item.gym_name || "");
   };
 
   const cancelEditWorkout = () => {
@@ -292,8 +301,12 @@ function Exerciser({ user, onUserChange }) {
       const updated = await api.updateWorkout(workoutId, {
         sets: editWorkoutSets.map((row) => ({ reps: Number(row.reps), weight: Number(row.weight), weight_unit: row.weight_unit || "kg" })),
         date: editWorkoutDate,
+        gym_name: editGymName.trim() || null,
       });
       setWorkouts(workouts.map((w) => (w.id === workoutId ? updated : w)));
+      if (editGymName.trim() && !userGyms.some((g) => g.name === editGymName.trim())) {
+        api.listUserGyms().then(setUserGyms).catch(() => {});
+      }
       if (lastSessions[updated.assigned_workout_id]?.id === workoutId) {
         setLastSessions((prev) => ({ ...prev, [updated.assigned_workout_id]: updated }));
       }
@@ -317,6 +330,20 @@ function Exerciser({ user, onUserChange }) {
     }
   };
 
+  const handleRenameGym = async (gymId) => {
+    const newName = renamingGymValue.trim();
+    if (!newName) return;
+    try {
+      const updated = await api.renameGym(gymId, newName);
+      setUserGyms((prev) =>
+        prev.map((g) => (g.id === gymId ? updated : g)).sort((a, b) => a.name.localeCompare(b.name))
+      );
+      setRenamingGymId(null);
+    } catch (err) {
+      setError(err.message || "Failed to rename gym.");
+    }
+  };
+
   const submitLeaveTrainer = async (e) => {
     e.preventDefault();
     if (!leaveNote.trim()) return;
@@ -334,6 +361,8 @@ function Exerciser({ user, onUserChange }) {
   const toggleExpand = (assigned) => {
     setError("");
     setSavedMessage("");
+    setManageGymsOpen(false);
+    setRenamingGymId(null);
     if (expandedId === assigned.id) {
       setExpandedId(null);
       return;
@@ -341,6 +370,7 @@ function Exerciser({ user, onUserChange }) {
     setExpandedId(assigned.id);
     setLogSets([{ reps: "", weight: "", weight_unit: "kg", logged: false, logged_at: null }]);
     setLogDate(toLocalDateStr(new Date()));
+    setGymName("");
     if (!(assigned.id in lastSessions)) {
       api
         .lastWorkoutFor(assigned.id)
@@ -377,12 +407,17 @@ function Exerciser({ user, onUserChange }) {
           ...(row.logged_at ? { logged_at: row.logged_at } : {}),
         })),
         date: logDate,
+        gym_name: gymName.trim() || null,
       });
       const [dash, w] = await Promise.all([api.dashboard(), api.listWorkouts()]);
       setDashboard(dash);
       setWorkouts(w);
       setLastSessions((prev) => ({ ...prev, [assigned.id]: logged }));
       setSavedMessage("Workout logged successfully!");
+      if (gymName.trim() && !userGyms.some((g) => g.name === gymName.trim())) {
+        api.listUserGyms().then(setUserGyms).catch(() => {});
+      }
+      setGymName("");
       setLogSets([{ reps: "", weight: "", weight_unit: "kg", logged: false, logged_at: null }]);
       clearRestTimer(user.id);
       setStatusRefresh((n) => n + 1);
@@ -538,6 +573,7 @@ function Exerciser({ user, onUserChange }) {
         </div>
         {showDate && <div className="card-subtitle">{formatDateLabel(item.date)}</div>}
         <div className="card-subtitle">Assigned by {item.trainer_name}</div>
+        {item.gym_name && <div className="card-gym-tag">🏢 {item.gym_name}</div>}
 
         {editingWorkoutId === item.id ? (
           <form onSubmit={(e) => submitEditWorkout(e, item.id)}>
@@ -550,6 +586,48 @@ function Exerciser({ user, onUserChange }) {
                 value={editWorkoutDate}
                 onChange={(e) => setEditWorkoutDate(e.target.value)}
               />
+            </div>
+            <div className="form-group">
+              <label className="form-label">
+                🏢 Gym <span className="form-label-optional">(optional)</span>
+                {userGyms.length > 0 && (
+                  <button type="button" className="gym-manage-btn" onClick={() => { setManageGymsOpen((o) => !o); setRenamingGymId(null); }}>⚙</button>
+                )}
+              </label>
+              <input
+                className="form-input"
+                type="text"
+                list="edit-gym-list"
+                placeholder="e.g. PureGym, Local Gym…"
+                value={editGymName}
+                onChange={(e) => setEditGymName(e.target.value)}
+                autoComplete="off"
+              />
+              {manageGymsOpen && userGyms.length > 0 && (
+                <div className="gym-manage-panel">
+                  {userGyms.map((g) => (
+                    <div key={g.id} className="gym-manage-item">
+                      {renamingGymId === g.id ? (
+                        <>
+                          <input className="gym-rename-input" value={renamingGymValue} onChange={(e) => setRenamingGymValue(e.target.value)} autoFocus />
+                          <button type="button" className="gym-rename-save" onClick={() => handleRenameGym(g.id)}>Save</button>
+                          <button type="button" className="gym-rename-cancel" onClick={() => setRenamingGymId(null)}>✕</button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="gym-manage-name">{g.name}</span>
+                          <button type="button" className="gym-rename-trigger" onClick={() => { setRenamingGymId(g.id); setRenamingGymValue(g.name); }}>✏</button>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {userGyms.length > 0 && (
+                <datalist id="edit-gym-list">
+                  {userGyms.map((g) => <option key={g.id} value={g.name} />)}
+                </datalist>
+              )}
             </div>
             {editWorkoutSets.map((row, idx) => (
               <div className="form-row" key={idx}>
@@ -786,7 +864,8 @@ function Exerciser({ user, onUserChange }) {
 
                       {last && (
                         <div className="card-subtitle">
-                          Last ({formatDateLabel(last.date)}): {last.sets
+                          Last ({formatDateLabel(last.date)}
+                          {last.gym_name ? ` · ${last.gym_name}` : ""}): {last.sets
                             .map((s) => s.weight_unit === "plates" ? `${s.weight} plates x${s.reps}` : `${s.weight}kg x${s.reps}`)
                             .join(", ")}
                         </div>
@@ -804,6 +883,50 @@ function Exerciser({ user, onUserChange }) {
                           value={logDate}
                           onChange={(e) => setLogDate(e.target.value)}
                         />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label" htmlFor={`gym-input-${assigned.id}`}>
+                          🏢 Gym <span className="form-label-optional">(optional)</span>
+                          {userGyms.length > 0 && (
+                            <button type="button" className="gym-manage-btn" onClick={() => { setManageGymsOpen((o) => !o); setRenamingGymId(null); }}>⚙</button>
+                          )}
+                        </label>
+                        <input
+                          id={`gym-input-${assigned.id}`}
+                          className="form-input"
+                          type="text"
+                          list={`gym-list-${assigned.id}`}
+                          placeholder="e.g. PureGym, Local Gym…"
+                          value={gymName}
+                          onChange={(e) => setGymName(e.target.value)}
+                          autoComplete="off"
+                        />
+                        {manageGymsOpen && userGyms.length > 0 && (
+                          <div className="gym-manage-panel">
+                            {userGyms.map((g) => (
+                              <div key={g.id} className="gym-manage-item">
+                                {renamingGymId === g.id ? (
+                                  <>
+                                    <input className="gym-rename-input" value={renamingGymValue} onChange={(e) => setRenamingGymValue(e.target.value)} autoFocus />
+                                    <button type="button" className="gym-rename-save" onClick={() => handleRenameGym(g.id)}>Save</button>
+                                    <button type="button" className="gym-rename-cancel" onClick={() => setRenamingGymId(null)}>✕</button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="gym-manage-name">{g.name}</span>
+                                    <button type="button" className="gym-rename-trigger" onClick={() => { setRenamingGymId(g.id); setRenamingGymValue(g.name); }}>✏</button>
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {userGyms.length > 0 && (
+                          <datalist id={`gym-list-${assigned.id}`}>
+                            {userGyms.map((g) => <option key={g.id} value={g.name} />)}
+                          </datalist>
+                        )}
                       </div>
 
                       {logSets.map((row, idx) => (

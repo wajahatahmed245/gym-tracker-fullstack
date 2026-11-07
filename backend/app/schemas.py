@@ -132,6 +132,17 @@ class DashboardOut(BaseModel):
     days_since_last_workout: Optional[int] = None
 
 
+class UserGymOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+
+
+class UserGymRename(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
 class ExerciseStatusItem(BaseModel):
     assigned_workout_id: int
     exercise: str
@@ -161,6 +172,7 @@ class WorkoutSetOut(BaseModel):
 class WorkoutLogCreate(BaseModel):
     sets: List[WorkoutSetIn] = Field(min_length=1)
     date: Optional[date_type] = None
+    gym_name: Optional[str] = None
 
 
 class WorkoutOut(BaseModel):
@@ -170,6 +182,7 @@ class WorkoutOut(BaseModel):
     exercise: str
     trainer_name: str
     date: date_type
+    gym_name: Optional[str] = None
     sets: List[WorkoutSetOut]
 
 
@@ -260,6 +273,7 @@ class LeaveNoteIn(BaseModel):
 class WorkoutUpdate(BaseModel):
     sets: List[WorkoutSetIn] = Field(min_length=1)
     date: Optional[date_type] = None
+    gym_name: Optional[str] = None
 
 
 # ---------- Availability ----------

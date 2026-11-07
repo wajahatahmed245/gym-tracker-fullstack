@@ -70,6 +70,8 @@ export const api = {
 
   // ---- exerciser ----
   dashboard: () => request("/exerciser/dashboard"),
+  listUserGyms: () => request("/exerciser/gyms"),
+  renameGym: (gymId, name) => request(`/exerciser/gyms/${gymId}`, { method: "PATCH", body: { name } }),
   updateProfile: (payload) => request("/exerciser/profile", { method: "PATCH", body: payload }),
   listWorkouts: () => request("/exerciser/workouts"),
   exerciserCardioExercises: () => request("/exerciser/cardio-exercises"),
