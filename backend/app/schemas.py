@@ -145,6 +145,7 @@ class ExerciseStatusItem(BaseModel):
 class WorkoutSetIn(BaseModel):
     reps: int = Field(gt=0)
     weight: float = Field(ge=0)
+    weight_unit: str = "kg"
     logged_at: Optional[datetime] = None
 
 
@@ -154,6 +155,7 @@ class WorkoutSetOut(BaseModel):
     set_number: int
     reps: int
     weight: float
+    weight_unit: str = "kg"
 
 
 class WorkoutLogCreate(BaseModel):

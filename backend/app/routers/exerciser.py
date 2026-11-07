@@ -61,7 +61,7 @@ def _workout_out(workout: Workout) -> WorkoutOut:
         trainer_name=trainer.name if trainer else "Former trainer",
         date=workout.date,
         sets=[
-            WorkoutSetOut(set_number=s.set_number, reps=s.reps, weight=s.weight)
+            WorkoutSetOut(set_number=s.set_number, reps=s.reps, weight=s.weight, weight_unit=getattr(s, "weight_unit", "kg"))
             for s in workout.sets
         ],
     )
@@ -188,7 +188,7 @@ def update_workout(
 
     workout.sets.clear()
     for set_number, set_in in enumerate(payload.sets, start=1):
-        workout.sets.append(WorkoutSet(set_number=set_number, reps=set_in.reps, weight=set_in.weight))
+        workout.sets.append(WorkoutSet(set_number=set_number, reps=set_in.reps, weight=set_in.weight, weight_unit=set_in.weight_unit))
 
     db.commit()
     db.refresh(workout)
@@ -280,7 +280,7 @@ def log_assigned_workout(
         date=payload.date or date.today(),
     )
     for set_number, set_in in enumerate(payload.sets, start=1):
-        workout.sets.append(WorkoutSet(set_number=set_number, reps=set_in.reps, weight=set_in.weight))
+        workout.sets.append(WorkoutSet(set_number=set_number, reps=set_in.reps, weight=set_in.weight, weight_unit=set_in.weight_unit))
 
     db.add(workout)
     db.commit()

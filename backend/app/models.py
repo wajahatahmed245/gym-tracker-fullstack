@@ -184,6 +184,7 @@ class WorkoutSet(Base):
     set_number: Mapped[int] = mapped_column(Integer, nullable=False)
     reps: Mapped[int] = mapped_column(Integer, nullable=False)
     weight: Mapped[float] = mapped_column(Float, nullable=False)
+    weight_unit: Mapped[str] = mapped_column(String(10), nullable=False, default="kg")
 
     workout: Mapped["Workout"] = relationship("Workout", back_populates="sets")
 

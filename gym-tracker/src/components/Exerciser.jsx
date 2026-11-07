@@ -87,14 +87,14 @@ function Exerciser({ user, onUserChange }) {
   const [trainerError, setTrainerError] = useState("");
 
   const [expandedId, setExpandedId] = useState(null);
-  const [logSets, setLogSets] = useState([{ reps: "", weight: "", logged: false, logged_at: null }]);
+  const [logSets, setLogSets] = useState([{ reps: "", weight: "", weight_unit: "kg", logged: false, logged_at: null }]);
   const [lastSessions, setLastSessions] = useState({});
 
   const [showLeaveForm, setShowLeaveForm] = useState(false);
   const [leaveNote, setLeaveNote] = useState("");
 
   const [editingWorkoutId, setEditingWorkoutId] = useState(null);
-  const [editWorkoutSets, setEditWorkoutSets] = useState([{ reps: "", weight: "" }]);
+  const [editWorkoutSets, setEditWorkoutSets] = useState([{ reps: "", weight: "", weight_unit: "kg" }]);
   const [editWorkoutDate, setEditWorkoutDate] = useState(() => toLocalDateStr(new Date()));
 
   const [logDate, setLogDate] = useState(() => toLocalDateStr(new Date()));
@@ -250,7 +250,8 @@ function Exerciser({ user, onUserChange }) {
   };
 
   const addSetRow = () => {
-    setLogSets([...logSets, { reps: "", weight: "", logged: false, logged_at: null }]);
+    const lastUnit = logSets.length > 0 ? logSets[logSets.length - 1].weight_unit : "kg";
+    setLogSets([...logSets, { reps: "", weight: "", weight_unit: lastUnit, logged: false, logged_at: null }]);
   };
 
   const removeSetRow = (index) => {
@@ -262,7 +263,8 @@ function Exerciser({ user, onUserChange }) {
   };
 
   const addEditSetRow = () => {
-    setEditWorkoutSets([...editWorkoutSets, { reps: "", weight: "" }]);
+    const lastUnit = editWorkoutSets.length > 0 ? editWorkoutSets[editWorkoutSets.length - 1].weight_unit : "kg";
+    setEditWorkoutSets([...editWorkoutSets, { reps: "", weight: "", weight_unit: lastUnit }]);
   };
 
   const removeEditSetRow = (index) => {
@@ -272,7 +274,7 @@ function Exerciser({ user, onUserChange }) {
   const startEditWorkout = (item) => {
     setError("");
     setEditingWorkoutId(item.id);
-    setEditWorkoutSets(item.sets.map((s) => ({ reps: String(s.reps), weight: String(s.weight) })));
+    setEditWorkoutSets(item.sets.map((s) => ({ reps: String(s.reps), weight: String(s.weight), weight_unit: s.weight_unit || "kg" })));
     setEditWorkoutDate(item.date);
   };
 
@@ -288,7 +290,7 @@ function Exerciser({ user, onUserChange }) {
     setError("");
     try {
       const updated = await api.updateWorkout(workoutId, {
-        sets: editWorkoutSets.map((row) => ({ reps: Number(row.reps), weight: Number(row.weight) })),
+        sets: editWorkoutSets.map((row) => ({ reps: Number(row.reps), weight: Number(row.weight), weight_unit: row.weight_unit || "kg" })),
         date: editWorkoutDate,
       });
       setWorkouts(workouts.map((w) => (w.id === workoutId ? updated : w)));
@@ -337,7 +339,7 @@ function Exerciser({ user, onUserChange }) {
       return;
     }
     setExpandedId(assigned.id);
-    setLogSets([{ reps: "", weight: "", logged: false, logged_at: null }]);
+    setLogSets([{ reps: "", weight: "", weight_unit: "kg", logged: false, logged_at: null }]);
     setLogDate(toLocalDateStr(new Date()));
     if (!(assigned.id in lastSessions)) {
       api
@@ -371,6 +373,7 @@ function Exerciser({ user, onUserChange }) {
         sets: logSets.map((row) => ({
           reps: Number(row.reps),
           weight: Number(row.weight),
+          weight_unit: row.weight_unit || "kg",
           ...(row.logged_at ? { logged_at: row.logged_at } : {}),
         })),
         date: logDate,
@@ -380,7 +383,7 @@ function Exerciser({ user, onUserChange }) {
       setWorkouts(w);
       setLastSessions((prev) => ({ ...prev, [assigned.id]: logged }));
       setSavedMessage("Workout logged successfully!");
-      setLogSets([{ reps: "", weight: "", logged: false, logged_at: null }]);
+      setLogSets([{ reps: "", weight: "", weight_unit: "kg", logged: false, logged_at: null }]);
       clearRestTimer(user.id);
       setStatusRefresh((n) => n + 1);
       setPostWorkoutPromptId(assigned.id);
@@ -551,11 +554,21 @@ function Exerciser({ user, onUserChange }) {
             {editWorkoutSets.map((row, idx) => (
               <div className="form-row" key={idx}>
                 <div className="form-group">
-                  <label className="form-label">Set {idx + 1} Weight (kg)</label>
+                  <div className="form-label-row">
+                    <span className="form-label">Set {idx + 1}</span>
+                    <button
+                      type="button"
+                      className={`unit-toggle${row.weight_unit === "plates" ? " unit-toggle--active" : ""}`}
+                      onClick={() => updateEditSetRow(idx, "weight_unit", row.weight_unit === "kg" ? "plates" : "kg")}
+                    >
+                      {row.weight_unit === "plates" ? "🏋️ Plates" : "⚖️ kg"}
+                    </button>
+                  </div>
                   <input
                     className="form-input"
                     type="number"
                     min="0"
+                    placeholder={row.weight_unit === "plates" ? "3" : "80"}
                     value={row.weight}
                     onChange={(e) => updateEditSetRow(idx, "weight", e.target.value)}
                   />
@@ -593,7 +606,7 @@ function Exerciser({ user, onUserChange }) {
           <>
             {item.sets.map((s) => (
               <div className="card-subtitle" key={s.set_number}>
-                Set {s.set_number}: {s.weight}kg x {s.reps} reps
+                Set {s.set_number}: {s.weight_unit === "plates" ? `${s.weight} plates` : `${s.weight}kg`} x {s.reps} reps
               </div>
             ))}
             <div className="row-between">
@@ -774,7 +787,7 @@ function Exerciser({ user, onUserChange }) {
                       {last && (
                         <div className="card-subtitle">
                           Last ({formatDateLabel(last.date)}): {last.sets
-                            .map((s) => `${s.weight}kg x${s.reps}`)
+                            .map((s) => s.weight_unit === "plates" ? `${s.weight} plates x${s.reps}` : `${s.weight}kg x${s.reps}`)
                             .join(", ")}
                         </div>
                       )}
@@ -797,12 +810,22 @@ function Exerciser({ user, onUserChange }) {
                         <div key={idx}>
                           <div className="form-row">
                             <div className="form-group">
-                              <label className="form-label">Set {idx + 1} Weight (kg)</label>
+                              <div className="form-label-row">
+                                <span className="form-label">Set {idx + 1}</span>
+                                <button
+                                  type="button"
+                                  className={`unit-toggle${(row.weight_unit || "kg") === "plates" ? " unit-toggle--active" : ""}`}
+                                  disabled={row.logged}
+                                  onClick={() => updateSetRow(idx, "weight_unit", (row.weight_unit || "kg") === "kg" ? "plates" : "kg")}
+                                >
+                                  {(row.weight_unit || "kg") === "plates" ? "🏋️ Plates" : "⚖️ kg"}
+                                </button>
+                              </div>
                               <input
                                 className="form-input"
                                 type="number"
                                 min="0"
-                                placeholder="80"
+                                placeholder={(row.weight_unit || "kg") === "plates" ? "3" : "80"}
                                 value={row.weight}
                                 disabled={row.logged}
                                 onChange={(e) => updateSetRow(idx, "weight", e.target.value)}
